@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 const VARIABLE_DRAG_MIME = "application/x-shotgun-variable";
 
 type PreviewChannel = "whatsapp" | "telegram" | "discord" | "messenger";
+type PreviewMode = "bot" | "group";
 
 const PREVIEW_CHANNELS: { key: PreviewChannel; label: string; color: string }[] = [
   { key: "whatsapp", label: "WhatsApp", color: "#25d366" },
@@ -64,6 +65,7 @@ export function MessageTemplateEditor({
   onChange,
 }: MessageTemplateEditorProps) {
   const [activePreview, setActivePreview] = useState<PreviewChannel>("whatsapp");
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("bot");
   const serializedValue = useMemo(() => JSON.stringify(value), [value]);
   const previewMessage = useMemo(
     () => renderMessageTemplatePreview(value),
@@ -303,18 +305,45 @@ export function MessageTemplateEditor({
           ))}
         </div>
 
+        <div className="flex items-center justify-center gap-1 rounded-full border border-border/60 bg-muted/20 p-1">
+          <button
+            type="button"
+            onClick={() => setPreviewMode("bot")}
+            className={cn(
+              "flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+              previewMode === "bot"
+                ? "bg-foreground/10 text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Conversation bot
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewMode("group")}
+            className={cn(
+              "flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+              previewMode === "group"
+                ? "bg-foreground/10 text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Groupe existant
+          </button>
+        </div>
+
         <div className="flex justify-center">
           {activePreview === "whatsapp" && (
-            <WhatsAppPreview message={previewMessage} />
+            <WhatsAppPreview message={previewMessage} mode={previewMode} />
           )}
           {activePreview === "telegram" && (
-            <TelegramPreview message={previewMessage} />
+            <TelegramPreview message={previewMessage} mode={previewMode} />
           )}
           {activePreview === "discord" && (
-            <DiscordPreview message={previewMessage} />
+            <DiscordPreview message={previewMessage} mode={previewMode} />
           )}
           {activePreview === "messenger" && (
-            <MessengerPreview message={previewMessage} />
+            <MessengerPreview message={previewMessage} mode={previewMode} />
           )}
         </div>
       </div>

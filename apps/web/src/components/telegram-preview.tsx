@@ -12,6 +12,7 @@ import {
 
 interface TelegramPreviewProps {
   message: string;
+  mode?: "bot" | "group";
 }
 
 function getPreviewTime() {
@@ -21,9 +22,20 @@ function getPreviewTime() {
   }).format(new Date());
 }
 
-export function TelegramPreview({ message }: TelegramPreviewProps) {
+function getPreviousTime() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - 8);
+  return new Intl.DateTimeFormat("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
+export function TelegramPreview({ message, mode = "bot" }: TelegramPreviewProps) {
   const renderedMessage = message || "Votre message apparaitra ici.";
   const previewTime = getPreviewTime();
+  const prevTime = getPreviousTime();
+  const isGroup = mode === "group";
 
   return (
     <div className="mx-auto flex h-[42rem] w-full max-w-[23rem] flex-col overflow-hidden rounded-[2.2rem] border border-black/20 bg-[#17212b] shadow-[0_28px_60px_rgba(0,0,0,0.38)]">
@@ -48,45 +60,37 @@ export function TelegramPreview({ message }: TelegramPreviewProps) {
 
       {/* Header */}
       <div className="flex items-center gap-2 bg-[#17212b] px-2 py-2.5">
-        <button
-          type="button"
-          className="grid size-8 place-items-center text-[#6ab3f3]"
-          aria-label="Retour"
-        >
+        <button type="button" className="grid size-8 place-items-center text-[#6ab3f3]" aria-label="Retour">
           <ChevronLeft className="size-5" strokeWidth={2.5} />
         </button>
 
-        <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#2AABEE] text-sm font-bold text-white">
-          SG
-        </div>
+        {isGroup ? (
+          <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#3e546a] text-sm font-bold text-white">
+            OE
+          </div>
+        ) : (
+          <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#2AABEE] text-sm font-bold text-white">
+            SG
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">
-            Shotgun Notifier
+            {isGroup ? "Orga Events" : "Shotgun Notifier"}
           </p>
-          <p className="truncate text-[11px] text-[#6ab3f3]">bot</p>
+          <p className="truncate text-[11px] text-[#6ab3f3]">
+            {isGroup ? "3 membres" : "bot"}
+          </p>
         </div>
 
         <div className="flex items-center gap-0.5 text-[#6ab3f3]">
-          <button
-            type="button"
-            className="grid size-8 place-items-center rounded-full"
-            aria-label="Recherche"
-          >
+          <button type="button" className="grid size-8 place-items-center rounded-full" aria-label="Recherche">
             <Search className="size-4" strokeWidth={2} />
           </button>
-          <button
-            type="button"
-            className="grid size-8 place-items-center rounded-full"
-            aria-label="Appel"
-          >
+          <button type="button" className="grid size-8 place-items-center rounded-full" aria-label="Appel">
             <Phone className="size-4" strokeWidth={2} />
           </button>
-          <button
-            type="button"
-            className="grid size-8 place-items-center rounded-full"
-            aria-label="Plus"
-          >
+          <button type="button" className="grid size-8 place-items-center rounded-full" aria-label="Plus">
             <EllipsisVertical className="size-4" strokeWidth={2} />
           </button>
         </div>
@@ -106,18 +110,45 @@ export function TelegramPreview({ message }: TelegramPreviewProps) {
           Aujourd&apos;hui
         </div>
 
-        {/* Message bubble */}
+        {isGroup && (
+          <>
+            {/* Message from Lucas */}
+            <div className="mb-3 flex justify-start">
+              <div className="max-w-[83%]">
+                <div className="rounded-2xl rounded-tl-md bg-[#182533] px-3.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.2)]">
+                  <div className="mb-0.5 text-[11px] font-semibold text-[#e67e22]">Lucas</div>
+                  <div className="pr-10 text-[13px] leading-[1.45] text-[#f5f5f5]">
+                    On en est ou des ventes ?
+                  </div>
+                  <div className="mt-0.5 flex justify-end text-[11px] text-[#6ab3f3]/50">{prevTime}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Message from Marie (sent - right side) */}
+            <div className="mb-3 flex justify-end">
+              <div className="max-w-[83%]">
+                <div className="rounded-2xl rounded-tr-md bg-[#2b5278] px-3.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.2)]">
+                  <div className="pr-10 text-[13px] leading-[1.45] text-[#f5f5f5]">
+                    Le bot va nous dire ca
+                  </div>
+                  <div className="mt-0.5 flex justify-end text-[11px] text-[#6ab3f3]/50">{prevTime}</div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Bot message */}
         <div className="flex justify-start">
           <div className="relative max-w-[83%]">
             <div className="rounded-2xl rounded-tl-md bg-[#182533] px-3.5 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.2)]">
               <div className="mb-1 text-[11px] font-semibold text-[#2AABEE]">
                 Shotgun Notifier
               </div>
-
               <div className="pr-10 text-[13px] leading-[1.45] whitespace-pre-wrap text-[#f5f5f5]">
                 {renderedMessage}
               </div>
-
               <div className="mt-1 flex justify-end text-[11px] text-[#6ab3f3]/50">
                 {previewTime}
               </div>
@@ -132,11 +163,9 @@ export function TelegramPreview({ message }: TelegramPreviewProps) {
           <div className="grid size-8 place-items-center text-[#6ab3f3]/60">
             <Smile className="size-5" strokeWidth={2} />
           </div>
-
           <div className="flex min-h-10 flex-1 items-center rounded-full bg-[#242f3d] px-3 text-[#6ab3f3]/40">
             <span className="text-sm">Message</span>
           </div>
-
           <div className="flex items-center gap-1 text-[#6ab3f3]/60">
             <div className="grid size-8 place-items-center">
               <Paperclip className="size-4.5" strokeWidth={2} />
