@@ -1,0 +1,5 @@
+{
+  "name": "shotgun-notifier",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"]
+}

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+out/
+
+# Turbo
+.turbo/
+
+# Cloudflare
+.wrangler/
+.state/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+!.dev.vars.example
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/

@@ -1,0 +1,31 @@
+{
+  "name": "notifshotgun",
+  "main": "src/worker_v2.js",
+  "workers_dev": true,
+  "preview_urls": false,
+  "compatibility_date": "2025-08-28",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1
+    }
+  },
+  "kv_namespaces": [
+    {
+      "id": "eaeeedfd2fab4f2abce20ff4c9f4ebf4",
+      "binding": "SALES_KV"
+    }
+  ],
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
+}
