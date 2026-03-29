@@ -129,7 +129,7 @@ export function DiscordPreview({ message, mode = "bot" }: DiscordPreviewProps) {
               </span>
               <span className="text-[11px] text-[#80848e]">{previewTime}</span>
             </div>
-            <div className="mt-0.5 whitespace-pre-wrap text-[13.5px] leading-[1.4] text-[#dbdee1]">
+            <div className="mt-0.5 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[13.5px] leading-[1.4] text-[#dbdee1]">
               {renderedMessage}
             </div>
           </div>

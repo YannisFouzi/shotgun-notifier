@@ -144,7 +144,7 @@ export function MessengerPreview({ message, mode = "bot" }: MessengerPreviewProp
           </div>
           <div className="max-w-[78%]">
             <div className="rounded-2xl rounded-bl-md bg-[#303030] px-3.5 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
-              <div className="whitespace-pre-wrap text-[13px] leading-[1.45] text-[#e4e6eb]">
+              <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[13px] leading-[1.45] text-[#e4e6eb]">
                 {renderedMessage}
               </div>
             </div>

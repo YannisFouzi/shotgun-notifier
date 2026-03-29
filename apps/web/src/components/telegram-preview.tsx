@@ -146,7 +146,7 @@ export function TelegramPreview({ message, mode = "bot" }: TelegramPreviewProps)
               <div className="mb-1 text-[11px] font-semibold text-[#2AABEE]">
                 Shotgun Notifier
               </div>
-              <div className="pr-10 text-[13px] leading-[1.45] whitespace-pre-wrap text-[#f5f5f5]">
+              <div className="pr-10 text-[13px] leading-[1.45] whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#f5f5f5]">
                 {renderedMessage}
               </div>
               <div className="mt-1 flex justify-end text-[11px] text-[#6ab3f3]/50">

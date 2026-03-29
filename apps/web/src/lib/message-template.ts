@@ -331,11 +331,11 @@ export const DEFAULT_MESSAGE_TEMPLATE_CONTENT: JSONContent = {
 
 export const MESSAGE_TEMPLATE_PRESETS: MessageTemplatePreset[] = [
   {
-    label: "Simple",
+    label: "Minimal",
     content: cloneContent(DEFAULT_MESSAGE_TEMPLATE_CONTENT),
   },
   {
-    label: "Avec l'event",
+    label: "Detaille",
     content: {
       type: "doc",
       content: [
@@ -355,7 +355,7 @@ export const MESSAGE_TEMPLATE_PRESETS: MessageTemplatePreset[] = [
     },
   },
   {
-    label: "Avec montant",
+    label: "Pro",
     content: {
       type: "doc",
       content: [

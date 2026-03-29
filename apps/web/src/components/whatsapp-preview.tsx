@@ -160,7 +160,7 @@ export function WhatsAppPreview({ message, mode = "bot" }: WhatsAppPreviewProps)
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#128c7e]">
                 {isGroup ? "Shotgun Notifier" : "Shotgun"}
               </div>
-              <div className="pr-10 text-[13px] leading-[1.45] whitespace-pre-wrap text-[#111b21]">
+              <div className="pr-10 text-[13px] leading-[1.45] whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#111b21]">
                 {renderedMessage}
               </div>
               <div className="mt-1 flex justify-end text-[11px] text-[#667781]">

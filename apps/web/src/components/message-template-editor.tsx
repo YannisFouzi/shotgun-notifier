@@ -220,27 +220,23 @@ export function MessageTemplateEditor({
           <Label>Message</Label>
         </div>
 
-        <div className="mt-4">
-          <p className="mb-2 text-[11px] text-muted-foreground/60">
-            Partir d&apos;un modele
-          </p>
-          <div className="flex flex-wrap gap-2">
+        <div className="mt-4 flex items-center gap-2">
+          <span className="text-xs font-medium text-foreground">Modele</span>
+          <div className="flex gap-1.5">
             {presetOptions.map((preset) => (
-              <Button
+              <button
                 key={preset.label}
                 type="button"
-                size="sm"
-                variant={preset.isActive ? "secondary" : "outline"}
-                className={cn(
-                  "rounded-full",
-                  preset.isActive
-                    ? "bg-foreground text-background hover:bg-foreground/90"
-                    : "border-border/70 bg-background/80 hover:bg-muted/40"
-                )}
                 onClick={() => applyPreset(preset.content)}
+                className={cn(
+                  "rounded-md border px-3 py-1.5 text-xs font-medium transition-all",
+                  preset.isActive
+                    ? "border-foreground/30 bg-foreground text-background shadow-sm"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/20 hover:text-foreground"
+                )}
               >
                 {preset.label}
-              </Button>
+              </button>
             ))}
           </div>
         </div>
@@ -295,7 +291,7 @@ export function MessageTemplateEditor({
         ) : null}
 
         <div className="mt-4 border-t border-border/70 pt-4">
-          <p className="text-[11px] text-muted-foreground/60">
+          <p className="text-xs text-foreground">
             Cliquez sur une info pour l&apos;ajouter, ou glissez-la directement dans le message.
           </p>
 
