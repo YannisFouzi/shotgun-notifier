@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType, type CSSProperties } from "react";
 import type { JSONContent } from "@tiptap/react";
 import { useRouter } from "next/navigation";
 
@@ -27,8 +27,12 @@ import {
 import {
   cloneMessageTemplateContent,
   DEFAULT_MESSAGE_TEMPLATE_CONTENT,
+  DEFAULT_MESSAGE_TEMPLATE_SETTINGS,
   readStoredMessageTemplateContent,
+  readStoredMessageTemplateSettings,
   saveStoredMessageTemplateContent,
+  saveStoredMessageTemplateSettings,
+  type MessageTemplateSettings,
 } from "@/lib/message-template";
 
 type NotifChannel = PreviewChannel;
@@ -37,7 +41,7 @@ interface ChannelConfig {
   key: NotifChannel;
   label: string;
   color: string;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  icon: ComponentType<{ className?: string; style?: CSSProperties }>;
   available: boolean;
   fields: { id: string; label: string; placeholder: string; type?: string }[];
 }
@@ -96,6 +100,8 @@ export function DashboardPageClient() {
   const [messageTemplate, setMessageTemplate] = useState<JSONContent>(
     cloneMessageTemplateContent(DEFAULT_MESSAGE_TEMPLATE_CONTENT)
   );
+  const [messageTemplateSettings, setMessageTemplateSettings] =
+    useState<MessageTemplateSettings>(DEFAULT_MESSAGE_TEMPLATE_SETTINGS);
   const [channelSaved, setChannelSaved] = useState(false);
   const [readyToAutosave, setReadyToAutosave] = useState(false);
 
@@ -104,6 +110,7 @@ export function DashboardPageClient() {
     setTelegramToken(storedConfig.telegramToken);
     setTelegramChatId(storedConfig.telegramChatId);
     setMessageTemplate(readStoredMessageTemplateContent());
+    setMessageTemplateSettings(readStoredMessageTemplateSettings());
     setReadyToAutosave(true);
   }, []);
 
@@ -113,13 +120,17 @@ export function DashboardPageClient() {
     }
 
     saveStoredMessageTemplateContent(messageTemplate);
-  }, [messageTemplate, readyToAutosave]);
+    saveStoredMessageTemplateSettings(messageTemplateSettings);
+  }, [messageTemplate, messageTemplateSettings, readyToAutosave]);
 
   function handleChannelSave() {
     saveStoredTelegramConfig(telegramToken, telegramChatId);
     setChannelSaved(true);
     setTimeout(() => setChannelSaved(false), 2000);
   }
+
+  const currentChannel =
+    CHANNELS.find((channel) => channel.key === activeChannel) ?? CHANNELS[0];
 
   return (
     <div className="min-h-screen">
@@ -186,61 +197,71 @@ export function DashboardPageClient() {
               })}
             </div>
 
-            {(() => {
-              const ch = CHANNELS.find((channel) => channel.key === activeChannel)!;
-              return (
-                <div
-                  className="rounded-xl border p-4"
-                  style={{ borderColor: ch.color + "25" }}
-                >
-                  {ch.available ? (
-                    <>
-                      <div className={cn("grid gap-3", ch.fields.length > 1 ? "sm:grid-cols-2" : "")}>
-                        {ch.fields.map((field) => (
-                          <div key={field.id} className="space-y-1.5">
-                            <Label htmlFor={field.id}>{field.label}</Label>
-                            <Input
-                              id={field.id}
-                              type={field.type || "text"}
-                              placeholder={field.placeholder}
-                              value={
-                                field.id === "tg-token" ? telegramToken
-                                : field.id === "tg-chat" ? telegramChatId
+            <div
+              className="rounded-xl border p-4"
+              style={{ borderColor: currentChannel.color + "25" }}
+            >
+              {currentChannel.available ? (
+                <>
+                  <div
+                    className={cn(
+                      "grid gap-3",
+                      currentChannel.fields.length > 1 ? "sm:grid-cols-2" : ""
+                    )}
+                  >
+                    {currentChannel.fields.map((field) => (
+                      <div key={field.id} className="space-y-1.5">
+                        <Label htmlFor={field.id}>{field.label}</Label>
+                        <Input
+                          id={field.id}
+                          type={field.type || "text"}
+                          placeholder={field.placeholder}
+                          value={
+                            field.id === "tg-token"
+                              ? telegramToken
+                              : field.id === "tg-chat"
+                                ? telegramChatId
                                 : ""
-                              }
-                              onChange={(e) => {
-                                setChannelSaved(false);
-                                if (field.id === "tg-token") setTelegramToken(e.target.value);
-                                if (field.id === "tg-chat") setTelegramChatId(e.target.value);
-                              }}
-                            />
-                          </div>
-                        ))}
+                          }
+                          onChange={(e) => {
+                            setChannelSaved(false);
+                            if (field.id === "tg-token") {
+                              setTelegramToken(e.target.value);
+                            }
+                            if (field.id === "tg-chat") {
+                              setTelegramChatId(e.target.value);
+                            }
+                          }}
+                        />
                       </div>
-                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                        {channelSaved && activeChannel === "telegram" && (
-                          <span className="text-xs text-emerald-400">
-                            Configuration enregistree
-                          </span>
-                        )}
-                        <Button onClick={handleChannelSave} size="sm" className="min-w-40">
-                          Enregistrer
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="py-6 text-center">
-                      <p className="text-sm text-muted-foreground">
-                        {ch.label} sera disponible prochainement.
-                      </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground/50">
-                        Les champs sont affiches a titre indicatif.
-                      </p>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                    {channelSaved && activeChannel === "telegram" && (
+                      <span className="text-xs text-emerald-400">
+                        Configuration enregistree
+                      </span>
+                    )}
+                    <Button
+                      onClick={handleChannelSave}
+                      size="sm"
+                      className="min-w-40"
+                    >
+                      Enregistrer
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="py-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {currentChannel.label} sera disponible prochainement.
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground/50">
+                    Les champs sont affiches a titre indicatif.
+                  </p>
                 </div>
-              );
-            })()}
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -255,8 +276,10 @@ export function DashboardPageClient() {
           <CardContent>
             <MessageTemplateEditor
               activePreview={activeChannel}
+              settings={messageTemplateSettings}
               value={messageTemplate}
               onChange={setMessageTemplate}
+              onSettingsChange={setMessageTemplateSettings}
             />
           </CardContent>
         </Card>

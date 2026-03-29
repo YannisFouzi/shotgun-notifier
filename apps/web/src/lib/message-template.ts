@@ -3,6 +3,7 @@ import type { JSONContent } from "@tiptap/react";
 import { SHOTGUN_VARIABLE_NODE_NAME } from "@/lib/shotgun-variable-node";
 
 export const MESSAGE_TEMPLATE_STORAGE_KEY = "message_template";
+export const MESSAGE_TEMPLATE_SETTINGS_STORAGE_KEY = "message_template_settings";
 
 export type MessageTemplateSection = "event" | "summary" | "deal" | "context";
 
@@ -22,9 +23,16 @@ export interface MessageTemplateVariable {
 
 export interface MessageTemplatePreset {
   content: JSONContent;
-  description: string;
   label: string;
 }
+
+export interface MessageTemplateSettings {
+  showEventNameOnlyWhenMultipleEvents: boolean;
+}
+
+export const DEFAULT_MESSAGE_TEMPLATE_SETTINGS: MessageTemplateSettings = {
+  showEventNameOnlyWhenMultipleEvents: false,
+};
 
 export const MESSAGE_TEMPLATE_SECTIONS: MessageTemplateSectionMeta[] = [
   {
@@ -270,6 +278,7 @@ export const SAMPLE_MESSAGE_TEMPLATE_CONTEXT: Record<string, string> = {
   sales_channels: "online",
   utm_mediums: "website",
   utm_sources: "shotgun",
+  scheduled_events_count: "1",
 };
 
 export function getMessageTemplateVariable(key: string) {
@@ -322,13 +331,11 @@ export const DEFAULT_MESSAGE_TEMPLATE_CONTENT: JSONContent = {
 
 export const MESSAGE_TEMPLATE_PRESETS: MessageTemplatePreset[] = [
   {
-    label: "Essentiel",
-    description: "Le message court qui va droit au but.",
+    label: "Simple",
     content: cloneContent(DEFAULT_MESSAGE_TEMPLATE_CONTENT),
   },
   {
-    label: "Event",
-    description: "Ajoute le contexte de la soiree avant la vente.",
+    label: "Avec l'event",
     content: {
       type: "doc",
       content: [
@@ -348,8 +355,7 @@ export const MESSAGE_TEMPLATE_PRESETS: MessageTemplatePreset[] = [
     },
   },
   {
-    label: "Business",
-    description: "Garde le cote vente avec montant et paiement.",
+    label: "Avec montant",
     content: {
       type: "doc",
       content: [
@@ -427,13 +433,36 @@ function renderMessageTemplate(
   return normalizeRenderedMessage(blocks.join("\n\n"));
 }
 
+function applyMessageTemplateSettings(
+  context: Record<string, string>,
+  settings: MessageTemplateSettings
+) {
+  if (!settings.showEventNameOnlyWhenMultipleEvents) {
+    return context;
+  }
+
+  const scheduledEventsCount = Number(context.scheduled_events_count || "1");
+
+  if (!Number.isFinite(scheduledEventsCount) || scheduledEventsCount >= 2) {
+    return context;
+  }
+
+  return {
+    ...context,
+    event_name: "",
+  };
+}
+
 export function renderMessageTemplatePreview(
   content: JSONContent,
-  context: Record<string, string> = SAMPLE_MESSAGE_TEMPLATE_CONTEXT
+  context: Record<string, string> = SAMPLE_MESSAGE_TEMPLATE_CONTEXT,
+  settings: MessageTemplateSettings = DEFAULT_MESSAGE_TEMPLATE_SETTINGS
 ) {
+  const resolvedContext = applyMessageTemplateSettings(context, settings);
+
   return renderMessageTemplate(
     content,
-    (key, label) => context[key] || `[${label}]`
+    (key, label) => resolvedContext[key] || `[${label}]`
   );
 }
 
@@ -489,6 +518,19 @@ export function readStoredMessageTemplateContent() {
   }
 }
 
+function normalizeMessageTemplateSettings(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return { ...DEFAULT_MESSAGE_TEMPLATE_SETTINGS };
+  }
+
+  const candidate = value as Partial<MessageTemplateSettings>;
+
+  return {
+    showEventNameOnlyWhenMultipleEvents:
+      candidate.showEventNameOnlyWhenMultipleEvents === true,
+  };
+}
+
 export function saveStoredMessageTemplateContent(content: JSONContent) {
   if (typeof window === "undefined") {
     return;
@@ -497,6 +539,36 @@ export function saveStoredMessageTemplateContent(content: JSONContent) {
   window.localStorage.setItem(
     MESSAGE_TEMPLATE_STORAGE_KEY,
     JSON.stringify(content)
+  );
+}
+
+export function readStoredMessageTemplateSettings() {
+  if (typeof window === "undefined") {
+    return { ...DEFAULT_MESSAGE_TEMPLATE_SETTINGS };
+  }
+
+  const raw = window.localStorage.getItem(MESSAGE_TEMPLATE_SETTINGS_STORAGE_KEY);
+  if (!raw) {
+    return { ...DEFAULT_MESSAGE_TEMPLATE_SETTINGS };
+  }
+
+  try {
+    return normalizeMessageTemplateSettings(JSON.parse(raw));
+  } catch {
+    return { ...DEFAULT_MESSAGE_TEMPLATE_SETTINGS };
+  }
+}
+
+export function saveStoredMessageTemplateSettings(
+  settings: MessageTemplateSettings
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(
+    MESSAGE_TEMPLATE_SETTINGS_STORAGE_KEY,
+    JSON.stringify(normalizeMessageTemplateSettings(settings))
   );
 }
 

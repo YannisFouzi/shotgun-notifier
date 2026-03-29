@@ -16,12 +16,14 @@ import { WhatsAppPreview } from "@/components/whatsapp-preview";
 import {
   cloneMessageTemplateContent,
   createMessageTemplateVariableNode,
-  DEFAULT_MESSAGE_TEMPLATE_CONTENT,
+  DEFAULT_MESSAGE_TEMPLATE_SETTINGS,
+  extractMessageTemplateVariableKeys,
   getMessageTemplateVariable,
   getMessageTemplateVariablesForSection,
   MESSAGE_TEMPLATE_PRESETS,
   MESSAGE_TEMPLATE_SECTIONS,
   renderMessageTemplatePreview,
+  type MessageTemplateSettings,
   type MessageTemplateVariable,
 } from "@/lib/message-template";
 import { ShotgunVariableNode } from "@/lib/shotgun-variable-node";
@@ -58,21 +60,37 @@ const SECTION_LABEL_STYLES: Record<string, string> = {
 
 interface MessageTemplateEditorProps {
   activePreview: PreviewChannel;
+  settings: MessageTemplateSettings;
   value: JSONContent;
   onChange: (content: JSONContent) => void;
+  onSettingsChange: (settings: MessageTemplateSettings) => void;
 }
 
 export function MessageTemplateEditor({
   activePreview,
+  settings = DEFAULT_MESSAGE_TEMPLATE_SETTINGS,
   value,
   onChange,
+  onSettingsChange,
 }: MessageTemplateEditorProps) {
   const [localPreview, setLocalPreview] = useState<PreviewChannel>(activePreview);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("bot");
   const serializedValue = useMemo(() => JSON.stringify(value), [value]);
+  const hasEventNameVariable = useMemo(
+    () => extractMessageTemplateVariableKeys(value).includes("event_name"),
+    [value]
+  );
   const previewMessage = useMemo(
     () => renderMessageTemplatePreview(value),
     [value]
+  );
+  const presetOptions = useMemo(
+    () =>
+      MESSAGE_TEMPLATE_PRESETS.map((preset) => ({
+        ...preset,
+        isActive: JSON.stringify(preset.content) === serializedValue,
+      })),
+    [serializedValue]
   );
 
   useEffect(() => {
@@ -99,11 +117,11 @@ export function MessageTemplateEditor({
     ],
     content: value,
     editorProps: {
-      attributes: {
-        class:
-          "sg-template-editor min-h-[10rem] cursor-text rounded-2xl border border-border/80 bg-background/80 px-4 py-3 text-sm leading-7 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] outline-none transition-colors [&_p]:min-h-[1.5rem] [&_p+p]:mt-3",
+        attributes: {
+          class:
+            "sg-template-editor min-h-[10rem] cursor-text rounded-2xl border border-border/80 bg-background/80 py-3 pl-4 pr-24 text-sm leading-7 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] outline-none transition-colors [&_p]:min-h-[1.5rem] [&_p+p]:mt-3",
+        },
       },
-    },
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON());
     },
@@ -187,56 +205,97 @@ export function MessageTemplateEditor({
     editor.commands.focus("end");
   }
 
-  function resetTemplate() {
-    applyPreset(DEFAULT_MESSAGE_TEMPLATE_CONTENT);
+  function toggleEventNameRule() {
+    onSettingsChange({
+      ...settings,
+      showEventNameOnlyWhenMultipleEvents:
+        !settings.showEventNameOnlyWhenMultipleEvents,
+    });
   }
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
       <div className="rounded-[28px] border border-border/80 p-4">
-        <div className="flex items-center justify-between border-b border-border/70 pb-3">
+        <div className="border-b border-border/70 pb-3">
           <Label>Message</Label>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => applyPreset({ type: "doc", content: [] })}
-            >
-              Vider
-            </Button>
-            <Button variant="ghost" size="sm" onClick={resetTemplate}>
-              Reinitialiser
-            </Button>
-          </div>
         </div>
 
-        <div
-          className="mt-4"
-          onDragOver={handleEditorDragOver}
-          onDropCapture={handleEditorDrop}
-        >
-          {editor ? <EditorContent editor={editor} /> : null}
-        </div>
-
-        <div className="mt-4 border-t border-border/70 pt-4">
+        <div className="mt-4">
           <p className="mb-2 text-[11px] text-muted-foreground/60">
             Partir d&apos;un modele
           </p>
-          <div className="grid grid-cols-3 gap-2">
-            {MESSAGE_TEMPLATE_PRESETS.map((preset) => (
-              <button
+          <div className="flex flex-wrap gap-2">
+            {presetOptions.map((preset) => (
+              <Button
                 key={preset.label}
                 type="button"
+                size="sm"
+                variant={preset.isActive ? "secondary" : "outline"}
+                className={cn(
+                  "rounded-full",
+                  preset.isActive
+                    ? "bg-foreground text-background hover:bg-foreground/90"
+                    : "border-border/70 bg-background/80 hover:bg-muted/40"
+                )}
                 onClick={() => applyPreset(preset.content)}
-                className="group rounded-lg border border-dashed border-border/50 px-3 py-2 text-left transition-colors hover:border-foreground/25 hover:bg-muted/20"
               >
-                <p className="text-xs font-semibold text-foreground/70 group-hover:text-foreground">{preset.label}</p>
-                <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{preset.description}</p>
-              </button>
+                {preset.label}
+              </Button>
             ))}
           </div>
+        </div>
 
-          <p className="mt-4 text-[11px] text-muted-foreground/60">
+        <div className="relative mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="absolute top-3 right-3 z-10 rounded-full border-border/70 bg-background/90 hover:bg-muted/60"
+            onClick={() => applyPreset({ type: "doc", content: [] })}
+          >
+            Vider
+          </Button>
+
+          <div
+            onDragOver={handleEditorDragOver}
+            onDropCapture={handleEditorDrop}
+          >
+            {editor ? <EditorContent editor={editor} /> : null}
+          </div>
+        </div>
+
+        {hasEventNameVariable ? (
+          <div className="mt-4 rounded-2xl border border-border/70 bg-background/50 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm leading-5 text-foreground/90">
+                Afficher le nom de l&apos;event seulement s&apos;il y a au moins 2 events prevus
+              </p>
+              <button
+                type="button"
+                aria-pressed={settings.showEventNameOnlyWhenMultipleEvents}
+                aria-label="Afficher le nom de l'event seulement s'il y a au moins 2 events prevus"
+                onClick={toggleEventNameRule}
+                className={cn(
+                  "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors",
+                  settings.showEventNameOnlyWhenMultipleEvents
+                    ? "border-foreground/10 bg-foreground"
+                    : "border-border/80 bg-muted/50"
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block size-5 rounded-full bg-background shadow-sm transition-transform",
+                    settings.showEventNameOnlyWhenMultipleEvents
+                      ? "translate-x-6"
+                      : "translate-x-1"
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-4 border-t border-border/70 pt-4">
+          <p className="text-[11px] text-muted-foreground/60">
             Cliquez sur une info pour l&apos;ajouter, ou glissez-la directement dans le message.
           </p>
 
