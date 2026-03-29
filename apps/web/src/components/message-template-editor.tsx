@@ -292,7 +292,7 @@ export function MessageTemplateEditor({
 
         <div className="mt-4 border-t border-border/70 pt-4">
           <p className="text-xs text-foreground">
-            Cliquez sur une info pour l&apos;ajouter, ou glissez-la directement dans le message.
+            Cliquez sur une info pour l&apos;ajouter<span className="hidden lg:inline">, ou glissez-la directement dans le message</span>.
           </p>
 
           <div className="mt-2 space-y-2">
