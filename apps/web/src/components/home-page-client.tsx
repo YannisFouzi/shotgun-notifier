@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DiscordPreview } from "@/components/discord-preview";
-import { MessengerPreview } from "@/components/messenger-preview";
 import { TelegramPreview } from "@/components/telegram-preview";
-import { WhatsAppPreview } from "@/components/whatsapp-preview";
+// Hidden — kept for future multi-platform support
+// import { DiscordPreview } from "@/components/discord-preview";
+// import { MessengerPreview } from "@/components/messenger-preview";
+// import { WhatsAppPreview } from "@/components/whatsapp-preview";
 import {
   buildShotgunEventsUrl,
   getOrganizerIdFromToken,
@@ -18,8 +19,7 @@ import {
   saveStoredShotgunToken,
   SHOTGUN_INTEGRATIONS_URL,
 } from "@/lib/shotgun";
-import { cn } from "@/lib/utils";
-
+// Hidden — kept for future multi-platform support
 type PreviewChannel = "whatsapp" | "telegram" | "messenger" | "discord";
 type PreviewMode = "bot" | "group";
 
@@ -28,8 +28,17 @@ interface PreviewScenario {
   channel: PreviewChannel;
   mode: PreviewMode;
   message: string;
+  hidden?: boolean;
 }
 
+const PREVIEW_MESSAGES: string[] = [
+  "Nouvelle vente Shotgun\n1 billet vendu : 57\nVAGUE 2 : 4/200\n16.50 EUR",
+  "Nouvelle vente Shotgun\n3 billets vendus : 60\nEARLY BIRD : 48/100\nVAGUE 1 : 12/300\n49.50 EUR",
+  "Nouvelle vente Shotgun\n2 billets vendus : 100\nEARLY BIRD : 100/100 SOLD OUT\nPaiement : card",
+  "KODZ X GUETTAPEN X MERCI LILLE\n1 mai 2026 - 21:00\n1 billet vendu : 57\nVAGUE 2 : 4/200",
+];
+
+// Kept for future multi-platform support
 const PREVIEW_SCENARIOS: PreviewScenario[] = [
   {
     id: "wa-sale",
@@ -37,13 +46,7 @@ const PREVIEW_SCENARIOS: PreviewScenario[] = [
     mode: "bot",
     message:
       "Nouvelle vente Shotgun\n1 billet vendu\nVAGUE 2 : 4/200\n57 billets vendus au total",
-  },
-  {
-    id: "tg-summary",
-    channel: "telegram",
-    mode: "group",
-    message:
-      "Point de vente Shotgun\nKODZ X GUETTAPEN X MERCI LILLE\n56 billets vendus\n164 billets restants",
+    hidden: true,
   },
   {
     id: "msg-alert",
@@ -51,6 +54,7 @@ const PREVIEW_SCENARIOS: PreviewScenario[] = [
     mode: "bot",
     message:
       "Alerte Shotgun\nVAGUE 1 est sold out\nVAGUE 2 devient le billet principal",
+    hidden: true,
   },
   {
     id: "dc-sale",
@@ -58,53 +62,34 @@ const PREVIEW_SCENARIOS: PreviewScenario[] = [
     mode: "group",
     message:
       "Nouvelle vente Shotgun\n2 billets vendus\nEARLY : 18/100\n82 billets restants",
+    hidden: true,
   },
 ];
 
-function renderPreview(
-  channel: PreviewChannel,
-  message: string,
-  mode: PreviewMode
-) {
-  if (channel === "whatsapp") {
-    return <WhatsAppPreview message={message} mode={mode} />;
-  }
-
-  if (channel === "telegram") {
-    return <TelegramPreview message={message} mode={mode} />;
-  }
-
-  if (channel === "messenger") {
-    return <MessengerPreview message={message} mode={mode} />;
-  }
-
-  return <DiscordPreview message={message} mode={mode} />;
-}
+// Hidden — kept for future multi-platform support
+// function renderPreview(channel: PreviewChannel, message: string, mode: PreviewMode) {
+//   if (channel === "whatsapp") return <WhatsAppPreview message={message} mode={mode} />;
+//   if (channel === "telegram") return <TelegramPreview message={message} mode={mode} />;
+//   if (channel === "messenger") return <MessengerPreview message={message} mode={mode} />;
+//   return <DiscordPreview message={message} mode={mode} />;
+// }
 
 export function HomePageClient() {
   const router = useRouter();
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeScenarioIndex, setActiveScenarioIndex] = useState(0);
-  const [previewPaused, setPreviewPaused] = useState(false);
+  const [activeMessageIndex, setActiveMessageIndex] = useState(0);
 
-  const activeScenario = useMemo(
-    () => PREVIEW_SCENARIOS[activeScenarioIndex] ?? PREVIEW_SCENARIOS[0],
-    [activeScenarioIndex]
-  );
+  const activeMessage = PREVIEW_MESSAGES[activeMessageIndex] ?? PREVIEW_MESSAGES[0];
 
   useEffect(() => {
-    if (previewPaused) {
-      return;
-    }
-
     const intervalId = window.setInterval(() => {
-      setActiveScenarioIndex((current) => (current + 1) % PREVIEW_SCENARIOS.length);
+      setActiveMessageIndex((current) => (current + 1) % PREVIEW_MESSAGES.length);
     }, 4200);
 
     return () => window.clearInterval(intervalId);
-  }, [previewPaused]);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -152,7 +137,7 @@ export function HomePageClient() {
           <section className="space-y-6 xl:flex xl:flex-col xl:justify-center">
             <div className="space-y-4">
               <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                Recevez un message a chaque vente Shotgun
+                Recevez un message sur Telegram a chaque vente Shotgun
               </h1>
               <p className="max-w-lg text-base leading-7 text-white/68">
                 Configurez vos notifications en quelques secondes.
@@ -210,32 +195,9 @@ export function HomePageClient() {
             </Card>
           </section>
 
-          <section
-            className="space-y-4 xl:flex xl:flex-col xl:items-center xl:justify-center"
-            onMouseEnter={() => setPreviewPaused(true)}
-            onMouseLeave={() => setPreviewPaused(false)}
-          >
+          <section className="xl:flex xl:flex-col xl:items-center xl:justify-center">
             <div className="flex justify-center">
-              {renderPreview(
-                activeScenario.channel,
-                activeScenario.message,
-                activeScenario.mode
-              )}
-            </div>
-
-            <div className="flex items-center justify-center gap-2">
-              {PREVIEW_SCENARIOS.map((scenario, index) => (
-                <button
-                  key={scenario.id}
-                  type="button"
-                  aria-label={`Voir l'aperçu ${index + 1}`}
-                  onClick={() => setActiveScenarioIndex(index)}
-                  className={cn(
-                    "h-2.5 rounded-full bg-white/18 transition-all",
-                    index === activeScenarioIndex ? "w-8 bg-white/80" : "w-2.5 hover:bg-white/35"
-                  )}
-                />
-              ))}
+              <TelegramPreview message={activeMessage} mode="group" />
             </div>
           </section>
         </div>

@@ -38,7 +38,7 @@ export function TelegramPreview({ message, mode = "bot" }: TelegramPreviewProps)
   const isGroup = mode === "group";
 
   return (
-    <div className="mx-auto flex h-[42rem] w-full max-w-[23rem] flex-col overflow-hidden rounded-[2.2rem] border border-black/20 bg-[#17212b] shadow-[0_28px_60px_rgba(0,0,0,0.38)]">
+    <div className="mx-auto flex h-[42rem] w-[23rem] shrink-0 flex-col overflow-hidden rounded-[2.2rem] border border-black/20 bg-[#17212b] shadow-[0_28px_60px_rgba(0,0,0,0.38)]">
       {/* Status bar */}
       <div className="bg-[#17212b] px-4 pb-0 pt-3 text-white">
         <div className="flex items-center justify-between text-[0.7rem] font-semibold tracking-[0.02em]">

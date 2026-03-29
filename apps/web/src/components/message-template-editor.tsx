@@ -34,11 +34,11 @@ const VARIABLE_DRAG_MIME = "application/x-shotgun-variable";
 export type PreviewChannel = "whatsapp" | "telegram" | "messenger" | "discord";
 type PreviewMode = "bot" | "group";
 
-const PREVIEW_CHANNELS: { key: PreviewChannel; label: string; color: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }[] = [
-  { key: "whatsapp", label: "WhatsApp", color: "#25d366", icon: WhatsAppIcon },
+const PREVIEW_CHANNELS: { key: PreviewChannel; label: string; color: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; hidden?: boolean }[] = [
+  { key: "whatsapp", label: "WhatsApp", color: "#25d366", icon: WhatsAppIcon, hidden: true },
   { key: "telegram", label: "Telegram", color: "#2AABEE", icon: TelegramIcon },
-  { key: "messenger", label: "Messenger", color: "#0084ff", icon: MessengerIcon },
-  { key: "discord", label: "Discord", color: "#5865F2", icon: DiscordIcon },
+  { key: "messenger", label: "Messenger", color: "#0084ff", icon: MessengerIcon, hidden: true },
+  { key: "discord", label: "Discord", color: "#5865F2", icon: DiscordIcon, hidden: true },
 ];
 
 const CHIP_BASE =
@@ -74,7 +74,7 @@ export function MessageTemplateEditor({
   onSettingsChange,
 }: MessageTemplateEditorProps) {
   const [localPreview, setLocalPreview] = useState<PreviewChannel>(activePreview);
-  const [previewMode, setPreviewMode] = useState<PreviewMode>("bot");
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("group");
   const serializedValue = useMemo(() => JSON.stringify(value), [value]);
   const hasEventNameVariable = useMemo(
     () => extractMessageTemplateVariableKeys(value).includes("event_name"),
@@ -339,63 +339,69 @@ export function MessageTemplateEditor({
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 p-1">
-          {PREVIEW_CHANNELS.map((channel) => {
-            const Icon = channel.icon;
-            const isActive = localPreview === channel.key;
-            return (
-              <button
-                key={channel.key}
-                type="button"
-                onClick={() => setLocalPreview(channel.key)}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
-                  isActive
-                    ? "shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                style={
-                  isActive
-                    ? { backgroundColor: channel.color + "18", color: channel.color }
-                    : undefined
-                }
-              >
-                <Icon
-                  className="size-3.5"
-                  style={isActive ? { color: channel.color } : undefined}
-                />
-                <span className="hidden sm:inline">{channel.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Channel preview selector — hidden when only one channel visible */}
+        {PREVIEW_CHANNELS.filter((ch) => !ch.hidden).length > 1 && (
+          <div className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 p-1">
+            {PREVIEW_CHANNELS.filter((ch) => !ch.hidden).map((channel) => {
+              const Icon = channel.icon;
+              const isActive = localPreview === channel.key;
+              return (
+                <button
+                  key={channel.key}
+                  type="button"
+                  onClick={() => setLocalPreview(channel.key)}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+                    isActive
+                      ? "shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  style={
+                    isActive
+                      ? { backgroundColor: channel.color + "18", color: channel.color }
+                      : undefined
+                  }
+                >
+                  <Icon
+                    className="size-3.5"
+                    style={isActive ? { color: channel.color } : undefined}
+                  />
+                  <span className="hidden sm:inline">{channel.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-        <div className="flex items-center justify-center gap-1 rounded-full border border-border/60 bg-muted/20 p-1">
-          <button
-            type="button"
-            onClick={() => setPreviewMode("bot")}
-            className={cn(
-              "flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
-              previewMode === "bot"
-                ? "bg-foreground/10 text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Conversation bot
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewMode("group")}
-            className={cn(
-              "flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
-              previewMode === "group"
-                ? "bg-foreground/10 text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Groupe existant
-          </button>
-        </div>
+        {/* Bot/group mode toggle — hidden when only one channel visible */}
+        {PREVIEW_CHANNELS.filter((ch) => !ch.hidden).length > 1 && (
+          <div className="flex items-center justify-center gap-1 rounded-full border border-border/60 bg-muted/20 p-1">
+            <button
+              type="button"
+              onClick={() => setPreviewMode("bot")}
+              className={cn(
+                "flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+                previewMode === "bot"
+                  ? "bg-foreground/10 text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Conversation bot
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewMode("group")}
+              className={cn(
+                "flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+                previewMode === "group"
+                  ? "bg-foreground/10 text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Groupe existant
+            </button>
+          </div>
+        )}
 
         <div className="flex justify-center">
           {localPreview === "whatsapp" && (

@@ -1,146 +1,180 @@
+import type { ReactNode } from "react";
 import { ExternalLink } from "lucide-react";
 
+import { BotFatherMockup } from "@/components/botfather-mockup";
+
+const B = ({ children }: { children: ReactNode }) => (
+  <strong className="font-semibold text-foreground">{children}</strong>
+);
+
 interface SetupStep {
-  text: string;
+  content: ReactNode;
   link?: { label: string; url: string };
+  columns?: {
+    left: { title: string; content: ReactNode };
+    right: { title: string; content: ReactNode };
+  };
 }
 
-interface ChannelGuide {
-  steps: SetupStep[];
-}
-
-const GUIDES: Record<string, ChannelGuide> = {
+const GUIDES: Record<string, { steps: SetupStep[]; mockup?: "botfather" }> = {
   telegram: {
+    mockup: "botfather",
     steps: [
       {
-        text: "Ouvrez Telegram et lancez une conversation avec",
+        content: <>Ouvrez Telegram et lancez une conversation avec</>,
         link: { label: "@BotFather", url: "https://t.me/BotFather" },
       },
       {
-        text: "Envoyez /newbot, choisissez un nom et un username. BotFather vous donne le Bot Token.",
+        content: <>Envoyez la commande <B>/newbot</B> et suivez les instructions : choisissez un <B>nom</B> (ex: Shotgun Notifier) puis un <B>username</B> (ex: shotgun_notifier_bot).</>,
       },
       {
-        text: "Pour le Chat ID, envoyez un message a votre bot puis ouvrez",
-        link: {
-          label: "api.telegram.org/bot<TOKEN>/getUpdates",
-          url: "https://core.telegram.org/bots/api#getupdates",
+        content: <>BotFather vous envoie un message avec votre <B>Bot Token</B> (ressemble a <B>7103948261:AAF...</B>). Copiez-le et collez-le dans le champ ci-dessous.</>,
+      },
+      {
+        content: <>Pour obtenir votre <B>Chat ID</B>, faites d&apos;abord parler le bot dans le bon endroit.</>,
+        columns: {
+          left: {
+            title: "Prive",
+            content: <>Ouvrez votre bot, envoyez-lui un message, puis cliquez sur <B>Detecter mes chats</B>.</>,
+          },
+          right: {
+            title: "Groupe",
+            content: <>Ajoutez <B>votre bot</B> au groupe, envoyez un message dans ce groupe, puis cliquez sur <B>Detecter mes chats</B>.</>,
+          },
         },
-      },
-      {
-        text: "Le Chat ID se trouve dans la reponse JSON sous result > message > chat > id.",
       },
     ],
   },
   discord: {
     steps: [
       {
-        text: "Ouvrez les parametres de votre serveur Discord.",
-      },
-      {
-        text: "Allez dans Integrations > Webhooks > Nouveau webhook.",
+        content: <>Creer un <B>webhook</B> dans le salon cible.</>,
         link: {
-          label: "Documentation Discord",
+          label: "Guide Discord",
           url: "https://support.discord.com/hc/fr/articles/228383668",
         },
       },
       {
-        text: "Choisissez le salon ou recevoir les notifications.",
-      },
-      {
-        text: "Cliquez sur Copier l'URL du webhook et collez-la ici.",
+        content: <>Copier l&apos;<B>URL du webhook</B>.</>,
       },
     ],
   },
   whatsapp: {
     steps: [
       {
-        text: "Creez une application sur Meta for Developers.",
+        content: <>Creer une app Meta avec <B>WhatsApp</B>.</>,
         link: {
-          label: "developers.facebook.com",
+          label: "Meta",
           url: "https://developers.facebook.com/apps/",
         },
       },
       {
-        text: "Ajoutez le produit WhatsApp a votre app et configurez un numero de telephone.",
-      },
-      {
-        text: "Dans Configuration API, generez un Access Token permanent.",
+        content: <>Recuperer <B>Access Token</B> et <B>Phone Number ID</B>.</>,
         link: {
-          label: "Documentation WhatsApp API",
+          label: "Doc",
           url: "https://developers.facebook.com/docs/whatsapp/cloud-api/get-started",
         },
-      },
-      {
-        text: "Copiez le Phone Number ID et le Token, puis collez-les ici.",
       },
     ],
   },
   messenger: {
     steps: [
       {
-        text: "Creez une application sur Meta for Developers.",
+        content: <>Creer une app Meta avec <B>Messenger</B>.</>,
         link: {
-          label: "developers.facebook.com",
+          label: "Meta",
           url: "https://developers.facebook.com/apps/",
         },
       },
       {
-        text: "Ajoutez le produit Messenger et connectez votre page Facebook.",
+        content: <>Recuperer <B>Page Access Token</B> et <B>PSID</B>.</>,
         link: {
-          label: "Documentation Messenger API",
+          label: "Doc",
           url: "https://developers.facebook.com/docs/messenger-platform/getting-started",
         },
-      },
-      {
-        text: "Generez un Page Access Token depuis les parametres Messenger de votre app.",
-      },
-      {
-        text: "Le Recipient ID (PSID) est l'identifiant de l'utilisateur qui a envoye un message a votre page.",
       },
     ],
   },
 };
 
-interface ChannelSetupGuideProps {
-  channelKey: string;
+function renderMockup(mockup: string) {
+  if (mockup === "botfather") {
+    return <BotFatherMockup />;
+  }
+  return null;
 }
 
-export function ChannelSetupGuide({ channelKey }: ChannelSetupGuideProps) {
+interface ChannelSetupGuideProps {
+  channelKey: string;
+  /** Render content after a specific step (0-indexed). Key = step index. */
+  slots?: Record<number, ReactNode>;
+  visibleSteps?: number;
+}
+
+export function ChannelSetupGuide({
+  channelKey,
+  slots,
+  visibleSteps,
+}: ChannelSetupGuideProps) {
   const guide = GUIDES[channelKey];
 
-  if (!guide) {
+  if (!guide?.steps.length) {
     return null;
   }
 
+  const steps = guide.steps.slice(0, visibleSteps ?? guide.steps.length);
+
   return (
-    <div className="mt-4 rounded-lg border border-border/40 bg-muted/10 px-4 py-3">
-      <p className="text-xs font-medium text-foreground">Comment obtenir ces informations ?</p>
-      <ol className="mt-2.5 space-y-2">
-        {guide.steps.map((step, i) => (
-          <li key={i} className="flex gap-2.5 text-[12px] leading-[1.5] text-muted-foreground">
-            <span className="mt-px flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted/50 text-[10px] font-semibold text-foreground/70">
-              {i + 1}
-            </span>
-            <span>
-              {step.text}
-              {step.link && (
-                <>
-                  {" "}
-                  <a
-                    href={step.link.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-0.5 font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
-                  >
-                    {step.link.label}
-                    <ExternalLink className="size-2.5" />
-                  </a>
-                </>
-              )}
-            </span>
+    <div className="grid gap-6 xl:grid-cols-[1fr_auto] xl:items-start">
+      <ol className="space-y-3">
+        {steps.map((step, index) => (
+          <li key={index}>
+            <div className="flex gap-3 text-sm leading-[1.6] text-foreground/80">
+              <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted/60 text-xs font-semibold text-foreground">
+                {index + 1}
+              </span>
+              <span>
+                {step.content}
+                {step.link && (
+                  <>
+                    {" "}
+                    <a
+                      href={step.link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
+                    >
+                      {step.link.label}
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </>
+                )}
+              </span>
+            </div>
+            {step.columns && (
+              <div className="mt-3 ml-9 grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border/40 bg-muted/5 px-3 py-2.5">
+                  <p className="text-xs font-semibold text-foreground mb-1.5">{step.columns.left.title}</p>
+                  <p className="text-[13px] leading-[1.5] text-foreground/70">{step.columns.left.content}</p>
+                </div>
+                <div className="rounded-lg border border-border/40 bg-muted/5 px-3 py-2.5">
+                  <p className="text-xs font-semibold text-foreground mb-1.5">{step.columns.right.title}</p>
+                  <p className="text-[13px] leading-[1.5] text-foreground/70">{step.columns.right.content}</p>
+                </div>
+              </div>
+            )}
+            {slots?.[index] && (
+              <div className="mt-2 pl-9">{slots[index]}</div>
+            )}
           </li>
         ))}
       </ol>
+
+      {guide.mockup && (
+        <div className="hidden xl:block">
+          {renderMockup(guide.mockup)}
+        </div>
+      )}
     </div>
   );
 }
