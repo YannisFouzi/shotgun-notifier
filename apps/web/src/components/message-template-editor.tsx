@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 
 import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
@@ -8,6 +8,9 @@ import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { DiscordPreview } from "@/components/discord-preview";
+import { MessengerPreview } from "@/components/messenger-preview";
+import { TelegramPreview } from "@/components/telegram-preview";
 import { WhatsAppPreview } from "@/components/whatsapp-preview";
 import {
   cloneMessageTemplateContent,
@@ -24,6 +27,15 @@ import { ShotgunVariableNode } from "@/lib/shotgun-variable-node";
 import { cn } from "@/lib/utils";
 
 const VARIABLE_DRAG_MIME = "application/x-shotgun-variable";
+
+type PreviewChannel = "whatsapp" | "telegram" | "discord" | "messenger";
+
+const PREVIEW_CHANNELS: { key: PreviewChannel; label: string; color: string }[] = [
+  { key: "whatsapp", label: "WhatsApp", color: "#25d366" },
+  { key: "telegram", label: "Telegram", color: "#2AABEE" },
+  { key: "discord", label: "Discord", color: "#5865F2" },
+  { key: "messenger", label: "Messenger", color: "#0084ff" },
+];
 
 const CHIP_BASE =
   "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors cursor-grab active:cursor-grabbing";
@@ -51,6 +63,7 @@ export function MessageTemplateEditor({
   value,
   onChange,
 }: MessageTemplateEditorProps) {
+  const [activePreview, setActivePreview] = useState<PreviewChannel>("whatsapp");
   const serializedValue = useMemo(() => JSON.stringify(value), [value]);
   const previewMessage = useMemo(
     () => renderMessageTemplatePreview(value),
@@ -170,7 +183,7 @@ export function MessageTemplateEditor({
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+    <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
       <div className="rounded-[28px] border border-border/80 p-4">
         <div className="flex items-center justify-between border-b border-border/70 pb-3">
           <Label>Message</Label>
@@ -266,13 +279,43 @@ export function MessageTemplateEditor({
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-border/80 p-4">
-        <div>
-          <p className="text-sm font-semibold">Apercu WhatsApp</p>
+      <div className="space-y-4">
+        <div className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 p-1">
+          {PREVIEW_CHANNELS.map((channel) => (
+            <button
+              key={channel.key}
+              type="button"
+              onClick={() => setActivePreview(channel.key)}
+              className={cn(
+                "flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+                activePreview === channel.key
+                  ? "shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              style={
+                activePreview === channel.key
+                  ? { backgroundColor: channel.color + "18", color: channel.color, borderColor: channel.color + "30" }
+                  : undefined
+              }
+            >
+              {channel.label}
+            </button>
+          ))}
         </div>
 
-        <div className="mt-4 rounded-[32px] border border-border/70 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-4">
-          <WhatsAppPreview message={previewMessage} />
+        <div className="flex justify-center">
+          {activePreview === "whatsapp" && (
+            <WhatsAppPreview message={previewMessage} />
+          )}
+          {activePreview === "telegram" && (
+            <TelegramPreview message={previewMessage} />
+          )}
+          {activePreview === "discord" && (
+            <DiscordPreview message={previewMessage} />
+          )}
+          {activePreview === "messenger" && (
+            <MessengerPreview message={previewMessage} />
+          )}
         </div>
       </div>
     </div>

@@ -44,7 +44,7 @@ export function WhatsAppPreview({ message }: WhatsAppPreviewProps) {
   const previewTime = getPreviewTime();
 
   return (
-    <div className="mx-auto w-full max-w-[23rem] overflow-hidden rounded-[2.2rem] border border-black/20 bg-[#0b141a] shadow-[0_28px_60px_rgba(0,0,0,0.38)]">
+    <div className="mx-auto flex h-[42rem] w-full max-w-[23rem] flex-col overflow-hidden rounded-[2.2rem] border border-black/20 bg-[#0b141a] shadow-[0_28px_60px_rgba(0,0,0,0.38)]">
       <div className="bg-[#0b141a] px-4 pb-3 pt-3 text-white">
         <div className="flex items-center justify-between text-[0.7rem] font-semibold tracking-[0.02em]">
           <span>9:41</span>
@@ -108,7 +108,7 @@ export function WhatsAppPreview({ message }: WhatsAppPreviewProps) {
         </div>
       </div>
 
-      <div className="min-h-[34rem] px-3 py-4" style={WALLPAPER_STYLE}>
+      <div className="flex-1 px-3 py-4" style={WALLPAPER_STYLE}>
         <div className="mx-auto mb-4 w-fit rounded-full bg-[#dff0f8] px-3 py-1 text-[11px] font-medium text-[#54656f] shadow-[0_1px_1px_rgba(0,0,0,0.08)]">
           Aujourd&apos;hui
         </div>
