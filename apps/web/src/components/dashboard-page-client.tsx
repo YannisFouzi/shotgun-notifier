@@ -6,13 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -147,20 +141,14 @@ export function DashboardPageClient() {
       <main className="mx-auto max-w-6xl space-y-6 px-6 py-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-2xl font-bold">Notifications</h2>
+            <h2 className="text-2xl font-bold">Canal de notification</h2>
             <p className="text-sm text-muted-foreground">
-              Choisissez un canal, configurez-le et preparez le message envoye.
+              Choisissez le canal a connecter.
             </p>
           </div>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Canaux de notification</CardTitle>
-            <CardDescription>
-              Selectionnez un canal puis renseignez ses identifiants.
-            </CardDescription>
-          </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-4 gap-2">
               {CHANNELS.map((ch) => {
@@ -256,16 +244,14 @@ export function DashboardPageClient() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="space-y-4">
-            <div>
-              <CardTitle className="text-base">Message de notification</CardTitle>
-              <CardDescription>
-                Composez le message puis ajoutez les variables utiles.
-              </CardDescription>
-            </div>
-          </CardHeader>
+        <div>
+          <h2 className="text-2xl font-bold">Message de notification</h2>
+          <p className="text-sm text-muted-foreground">
+            Ecrivez votre message puis ajoutez les informations a afficher.
+          </p>
+        </div>
 
+        <Card>
           <CardContent>
             <MessageTemplateEditor
               activePreview={activeChannel}
