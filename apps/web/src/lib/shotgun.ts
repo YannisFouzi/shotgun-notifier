@@ -5,8 +5,11 @@ export const SHOTGUN_INTEGRATIONS_URL =
   "https://smartboard.shotgun.live/fr/settings/integrations";
 
 export const SHOTGUN_TOKEN_STORAGE_KEY = "sg_token";
+export const SHOTGUN_TOKEN_COOKIE_KEY = SHOTGUN_TOKEN_STORAGE_KEY;
 export const TELEGRAM_TOKEN_STORAGE_KEY = "tg_token";
 export const TELEGRAM_CHAT_ID_STORAGE_KEY = "tg_chat_id";
+
+const SHOTGUN_TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
 export function normalizeShotgunToken(token: string) {
   return token.trim();
@@ -28,6 +31,63 @@ function decodeBase64Url(value: string) {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
   return atob(padded);
+}
+
+function readCookieValue(cookieSource: string, cookieName: string) {
+  const cookiePrefix = `${cookieName}=`;
+  const cookiePart = cookieSource
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(cookiePrefix));
+
+  if (!cookiePart) {
+    return "";
+  }
+
+  return decodeURIComponent(cookiePart.slice(cookiePrefix.length));
+}
+
+function writeCookieValue(cookieName: string, cookieValue: string) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const attributes = [
+    "Path=/",
+    "SameSite=Lax",
+    `Max-Age=${SHOTGUN_TOKEN_COOKIE_MAX_AGE}`,
+  ];
+
+  if (window.location.protocol === "https:") {
+    attributes.push("Secure");
+  }
+
+  document.cookie = `${cookieName}=${encodeURIComponent(cookieValue)}; ${attributes.join("; ")}`;
+}
+
+function clearCookieValue(cookieName: string) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const attributes = [
+    "Path=/",
+    "SameSite=Lax",
+    "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    "Max-Age=0",
+  ];
+
+  if (window.location.protocol === "https:") {
+    attributes.push("Secure");
+  }
+
+  document.cookie = `${cookieName}=; ${attributes.join("; ")}`;
+}
+
+export function readStoredShotgunTokenFromCookieString(cookieSource: string) {
+  return normalizeShotgunToken(
+    readCookieValue(cookieSource, SHOTGUN_TOKEN_COOKIE_KEY)
+  );
 }
 
 export function getOrganizerIdFromToken(token: string) {
@@ -53,9 +113,21 @@ export function readStoredShotgunToken() {
     return "";
   }
 
-  return normalizeShotgunToken(
+  const localToken = normalizeShotgunToken(
     window.localStorage.getItem(SHOTGUN_TOKEN_STORAGE_KEY) || ""
   );
+
+  if (localToken) {
+    return localToken;
+  }
+
+  const cookieToken = readStoredShotgunTokenFromCookieString(document.cookie);
+
+  if (cookieToken) {
+    window.localStorage.setItem(SHOTGUN_TOKEN_STORAGE_KEY, cookieToken);
+  }
+
+  return cookieToken;
 }
 
 export function saveStoredShotgunToken(token: string) {
@@ -67,10 +139,12 @@ export function saveStoredShotgunToken(token: string) {
 
   if (!normalizedToken) {
     window.localStorage.removeItem(SHOTGUN_TOKEN_STORAGE_KEY);
+    clearCookieValue(SHOTGUN_TOKEN_COOKIE_KEY);
     return;
   }
 
   window.localStorage.setItem(SHOTGUN_TOKEN_STORAGE_KEY, normalizedToken);
+  writeCookieValue(SHOTGUN_TOKEN_COOKIE_KEY, normalizedToken);
 }
 
 export function clearStoredShotgunToken() {
@@ -79,6 +153,7 @@ export function clearStoredShotgunToken() {
   }
 
   window.localStorage.removeItem(SHOTGUN_TOKEN_STORAGE_KEY);
+  clearCookieValue(SHOTGUN_TOKEN_COOKIE_KEY);
 }
 
 export function readStoredTelegramConfig() {
