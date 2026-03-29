@@ -9,6 +9,7 @@ import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DiscordPreview } from "@/components/discord-preview";
+import { DiscordIcon, MessengerIcon, TelegramIcon, WhatsAppIcon } from "@/components/icons";
 import { MessengerPreview } from "@/components/messenger-preview";
 import { TelegramPreview } from "@/components/telegram-preview";
 import { WhatsAppPreview } from "@/components/whatsapp-preview";
@@ -28,14 +29,14 @@ import { cn } from "@/lib/utils";
 
 const VARIABLE_DRAG_MIME = "application/x-shotgun-variable";
 
-type PreviewChannel = "whatsapp" | "telegram" | "discord" | "messenger";
+export type PreviewChannel = "whatsapp" | "telegram" | "messenger" | "discord";
 type PreviewMode = "bot" | "group";
 
-const PREVIEW_CHANNELS: { key: PreviewChannel; label: string; color: string }[] = [
-  { key: "whatsapp", label: "WhatsApp", color: "#25d366" },
-  { key: "telegram", label: "Telegram", color: "#2AABEE" },
-  { key: "discord", label: "Discord", color: "#5865F2" },
-  { key: "messenger", label: "Messenger", color: "#0084ff" },
+const PREVIEW_CHANNELS: { key: PreviewChannel; label: string; color: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }[] = [
+  { key: "whatsapp", label: "WhatsApp", color: "#25d366", icon: WhatsAppIcon },
+  { key: "telegram", label: "Telegram", color: "#2AABEE", icon: TelegramIcon },
+  { key: "messenger", label: "Messenger", color: "#0084ff", icon: MessengerIcon },
+  { key: "discord", label: "Discord", color: "#5865F2", icon: DiscordIcon },
 ];
 
 const CHIP_BASE =
@@ -56,21 +57,27 @@ const SECTION_LABEL_STYLES: Record<string, string> = {
 };
 
 interface MessageTemplateEditorProps {
+  activePreview: PreviewChannel;
   value: JSONContent;
   onChange: (content: JSONContent) => void;
 }
 
 export function MessageTemplateEditor({
+  activePreview,
   value,
   onChange,
 }: MessageTemplateEditorProps) {
-  const [activePreview, setActivePreview] = useState<PreviewChannel>("whatsapp");
+  const [localPreview, setLocalPreview] = useState<PreviewChannel>(activePreview);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("bot");
   const serializedValue = useMemo(() => JSON.stringify(value), [value]);
   const previewMessage = useMemo(
     () => renderMessageTemplatePreview(value),
     [value]
   );
+
+  useEffect(() => {
+    setLocalPreview(activePreview);
+  }, [activePreview]);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -212,29 +219,24 @@ export function MessageTemplateEditor({
         </div>
 
         <div className="mt-4 border-t border-border/70 pt-4">
-          <div className="flex items-center gap-3">
-            <p className="shrink-0 text-xs font-semibold text-muted-foreground">
-              Modeles
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {MESSAGE_TEMPLATE_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => applyPreset(preset.content)}
-                  className={cn(
-                    CHIP_BASE,
-                    "border border-border/60 bg-muted/30 text-foreground/80 hover:bg-muted hover:text-foreground"
-                  )}
-                  title={preset.description}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
+          <p className="mb-2 text-[11px] text-muted-foreground/60">
+            Partir d&apos;un modele
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {MESSAGE_TEMPLATE_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => applyPreset(preset.content)}
+                className="group rounded-lg border border-dashed border-border/50 px-3 py-2 text-left transition-colors hover:border-foreground/25 hover:bg-muted/20"
+              >
+                <p className="text-xs font-semibold text-foreground/70 group-hover:text-foreground">{preset.label}</p>
+                <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{preset.description}</p>
+              </button>
+            ))}
           </div>
 
-          <p className="mt-3 text-[11px] text-muted-foreground/60">
+          <p className="mt-4 text-[11px] text-muted-foreground/60">
             Cliquez sur une info pour l&apos;ajouter, ou glissez-la directement dans le message.
           </p>
 
@@ -283,26 +285,34 @@ export function MessageTemplateEditor({
 
       <div className="space-y-4">
         <div className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 p-1">
-          {PREVIEW_CHANNELS.map((channel) => (
-            <button
-              key={channel.key}
-              type="button"
-              onClick={() => setActivePreview(channel.key)}
-              className={cn(
-                "flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
-                activePreview === channel.key
-                  ? "shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              style={
-                activePreview === channel.key
-                  ? { backgroundColor: channel.color + "18", color: channel.color, borderColor: channel.color + "30" }
-                  : undefined
-              }
-            >
-              {channel.label}
-            </button>
-          ))}
+          {PREVIEW_CHANNELS.map((channel) => {
+            const Icon = channel.icon;
+            const isActive = localPreview === channel.key;
+            return (
+              <button
+                key={channel.key}
+                type="button"
+                onClick={() => setLocalPreview(channel.key)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+                  isActive
+                    ? "shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                style={
+                  isActive
+                    ? { backgroundColor: channel.color + "18", color: channel.color }
+                    : undefined
+                }
+              >
+                <Icon
+                  className="size-3.5"
+                  style={isActive ? { color: channel.color } : undefined}
+                />
+                <span className="hidden sm:inline">{channel.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex items-center justify-center gap-1 rounded-full border border-border/60 bg-muted/20 p-1">
@@ -333,16 +343,16 @@ export function MessageTemplateEditor({
         </div>
 
         <div className="flex justify-center">
-          {activePreview === "whatsapp" && (
+          {localPreview === "whatsapp" && (
             <WhatsAppPreview message={previewMessage} mode={previewMode} />
           )}
-          {activePreview === "telegram" && (
+          {localPreview === "telegram" && (
             <TelegramPreview message={previewMessage} mode={previewMode} />
           )}
-          {activePreview === "discord" && (
+          {localPreview === "discord" && (
             <DiscordPreview message={previewMessage} mode={previewMode} />
           )}
-          {activePreview === "messenger" && (
+          {localPreview === "messenger" && (
             <MessengerPreview message={previewMessage} mode={previewMode} />
           )}
         </div>

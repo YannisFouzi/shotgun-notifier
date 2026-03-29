@@ -126,6 +126,12 @@
   html {
     @apply font-sans;
     }
+  button {
+    cursor: pointer;
+    }
+  button:disabled {
+    cursor: not-allowed;
+    }
 }
 
 .sg-template-editor p.is-editor-empty:first-child::before {
@@ -136,7 +142,21 @@
   pointer-events: none;
 }
 
-.sg-template-editor .ProseMirror-selectednode {
+.sg-template-editor .ProseMirror-selectednode:not([data-shotgun-variable]) {
   box-shadow: 0 0 0 2px var(--ring);
   border-radius: 9999px;
+}
+
+.sg-template-editor [data-shotgun-variable].ProseMirror-selectednode {
+  box-shadow: none;
+}
+
+.sg-template-editor [data-shotgun-variable],
+.sg-template-editor [data-shotgun-variable]:focus,
+.sg-template-editor [data-shotgun-variable]:focus-visible,
+.sg-template-editor [data-shotgun-variable] button,
+.sg-template-editor [data-shotgun-variable] button:focus,
+.sg-template-editor [data-shotgun-variable] button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }

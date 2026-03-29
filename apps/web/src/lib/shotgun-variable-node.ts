@@ -1,4 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+
+import { ShotgunVariableChip } from "@/components/shotgun-variable-chip";
 
 export const SHOTGUN_VARIABLE_NODE_NAME = "shotgunVariable";
 
@@ -22,7 +25,7 @@ export const ShotgunVariableNode = Node.create({
   group: "inline",
   inline: true,
   atom: true,
-  selectable: true,
+  selectable: false,
 
   addAttributes() {
     return {
@@ -60,6 +63,10 @@ export const ShotgunVariableNode = Node.create({
   renderText({ node }) {
     const attributes = node.attrs as ShotgunVariableNodeAttributes;
     return `{{${attributes.key}}}`;
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ShotgunVariableChip);
   },
 
   addCommands() {
