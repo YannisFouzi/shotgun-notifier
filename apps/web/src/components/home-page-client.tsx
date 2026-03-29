@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { DiscordPreview } from "@/components/discord-preview";
 import { MessengerPreview } from "@/components/messenger-preview";
@@ -183,14 +182,15 @@ export function HomePageClient() {
             <Card className="rounded-[28px] border border-white/10 bg-black/35 py-0 shadow-[0_30px_70px_rgba(0,0,0,0.35)] backdrop-blur-xl">
               <CardContent className="px-6 py-6">
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <Input
+                  <input
                     id="token"
                     type="password"
+                    autoComplete="off"
                     placeholder="eyJhbGci..."
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     required
-                    className="h-12 rounded-2xl border-white/12 bg-white/[0.03] px-4 text-white placeholder:text-white/35 dark:bg-white/[0.03]"
+                    className="h-12 w-full min-w-0 rounded-2xl border border-white/12 bg-white/[0.03] px-4 text-base text-white outline-none transition-colors placeholder:text-white/35 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   />
 
                   {error ? (

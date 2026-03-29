@@ -24,6 +24,7 @@ import {
   WhatsAppIcon,
   MessengerIcon,
 } from "@/components/icons";
+import { ChannelSetupGuide } from "@/components/channel-setup-guide";
 import {
   cloneMessageTemplateContent,
   DEFAULT_MESSAGE_TEMPLATE_CONTENT,
@@ -54,8 +55,8 @@ const CHANNELS: ChannelConfig[] = [
     icon: WhatsAppIcon,
     available: false,
     fields: [
-      { id: "wa-token", label: "API Token", placeholder: "EAAx...", type: "password" },
-      { id: "wa-phone", label: "Numero", placeholder: "+33612345678" },
+      { id: "wa-token", label: "Access Token", placeholder: "EAAx...", type: "password" },
+      { id: "wa-phone", label: "Phone Number ID", placeholder: "106xxxxxxxxxx" },
     ],
   },
   {
@@ -76,8 +77,8 @@ const CHANNELS: ChannelConfig[] = [
     icon: MessengerIcon,
     available: false,
     fields: [
-      { id: "msg-token", label: "Page Token", placeholder: "EAAx...", type: "password" },
-      { id: "msg-recipient", label: "Recipient ID", placeholder: "123456789" },
+      { id: "msg-token", label: "Page Access Token", placeholder: "EAAx...", type: "password" },
+      { id: "msg-recipient", label: "Recipient ID (PSID)", placeholder: "123456789" },
     ],
   },
   {
@@ -201,64 +202,64 @@ export function DashboardPageClient() {
               className="rounded-xl border p-4"
               style={{ borderColor: currentChannel.color + "25" }}
             >
-              {currentChannel.available ? (
-                <>
-                  <div
-                    className={cn(
-                      "grid gap-3",
-                      currentChannel.fields.length > 1 ? "sm:grid-cols-2" : ""
-                    )}
+              {!currentChannel.available && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                  <span className="text-xs font-medium text-amber-400">Bientot disponible</span>
+                  <span className="text-[11px] text-muted-foreground">— configurez des maintenant pour etre pret.</span>
+                </div>
+              )}
+
+              <div
+                className={cn(
+                  "grid gap-3",
+                  currentChannel.fields.length > 1 ? "sm:grid-cols-2" : ""
+                )}
+              >
+                {currentChannel.fields.map((field) => (
+                  <div key={field.id} className="space-y-1.5">
+                    <Label htmlFor={field.id}>{field.label}</Label>
+                    <Input
+                      id={field.id}
+                      type={field.type || "text"}
+                      placeholder={field.placeholder}
+                      disabled={!currentChannel.available}
+                      value={
+                        field.id === "tg-token"
+                          ? telegramToken
+                          : field.id === "tg-chat"
+                            ? telegramChatId
+                            : ""
+                      }
+                      onChange={(e) => {
+                        setChannelSaved(false);
+                        if (field.id === "tg-token") {
+                          setTelegramToken(e.target.value);
+                        }
+                        if (field.id === "tg-chat") {
+                          setTelegramChatId(e.target.value);
+                        }
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <ChannelSetupGuide channelKey={currentChannel.key} />
+
+              {currentChannel.available && (
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                  {channelSaved && activeChannel === "telegram" && (
+                    <span className="text-xs text-emerald-400">
+                      Configuration enregistree
+                    </span>
+                  )}
+                  <Button
+                    onClick={handleChannelSave}
+                    size="sm"
+                    className="min-w-40"
                   >
-                    {currentChannel.fields.map((field) => (
-                      <div key={field.id} className="space-y-1.5">
-                        <Label htmlFor={field.id}>{field.label}</Label>
-                        <Input
-                          id={field.id}
-                          type={field.type || "text"}
-                          placeholder={field.placeholder}
-                          value={
-                            field.id === "tg-token"
-                              ? telegramToken
-                              : field.id === "tg-chat"
-                                ? telegramChatId
-                                : ""
-                          }
-                          onChange={(e) => {
-                            setChannelSaved(false);
-                            if (field.id === "tg-token") {
-                              setTelegramToken(e.target.value);
-                            }
-                            if (field.id === "tg-chat") {
-                              setTelegramChatId(e.target.value);
-                            }
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                    {channelSaved && activeChannel === "telegram" && (
-                      <span className="text-xs text-emerald-400">
-                        Configuration enregistree
-                      </span>
-                    )}
-                    <Button
-                      onClick={handleChannelSave}
-                      size="sm"
-                      className="min-w-40"
-                    >
-                      Enregistrer
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="py-6 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {currentChannel.label} sera disponible prochainement.
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground/50">
-                    Les champs sont affiches a titre indicatif.
-                  </p>
+                    Enregistrer
+                  </Button>
                 </div>
               )}
             </div>
