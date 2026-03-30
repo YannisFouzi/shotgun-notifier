@@ -10,11 +10,12 @@ import {
 import type { JSONContent } from "@tiptap/react";
 import { useRouter } from "next/navigation";
 import { Trans, useTranslation } from "react-i18next";
-import { Bot, Loader2, Pencil, User, Users } from "lucide-react";
+import { Bot, Loader2, Pencil, Send, User, Users } from "lucide-react";
 
 import type { DiscoveredChatSubtitleI18n } from "@/app/api/telegram/_lib";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { MessageTemplateEditor } from "@/components/message-template-editor";
 import { ChannelSetupGuide } from "@/components/channel-setup-guide";
 import { DeleteAccountSection } from "@/components/delete-account-dialog";
@@ -36,10 +37,17 @@ import {
   clearStoredShotgunToken,
   readStoredTelegramConfig,
   saveStoredTelegramConfig,
+  TELEGRAM_SEND_AS_CHAT_STORAGE_KEY,
 } from "@/lib/shotgun";
 import type { TFunction } from "i18next";
 
-import { apiGetConfig, apiUpdateConfig, apiUpdateTemplate } from "@/lib/api";
+import {
+  ApiError,
+  apiGetConfig,
+  apiTelegramTest,
+  apiUpdateConfig,
+  apiUpdateTemplate,
+} from "@/lib/api";
 import { resolveTelegramApiErrorMessage } from "@/lib/telegram-api-error";
 import { type SyncStatus } from "@/components/sync-indicator";
 import { cn } from "@/lib/utils";
@@ -167,6 +175,12 @@ export function DashboardPageClient() {
     useState("");
   const [telegramChatValidated, setTelegramChatValidated] = useState(false);
   const [telegramConfigured, setTelegramConfigured] = useState(false);
+  const [telegramSendAsChat, setTelegramSendAsChat] = useState(false);
+  const [sendAsChatSaving, setSendAsChatSaving] = useState(false);
+  const [telegramTestStatus, setTelegramTestStatus] = useState<
+    "idle" | "loading" | "ok" | "error"
+  >("idle");
+  const [telegramTestError, setTelegramTestError] = useState("");
   const [telegramConfigExpanded, setTelegramConfigExpanded] = useState(true);
   const [channelSaved, setChannelSaved] = useState(false);
   const [editingBotToken, setEditingBotToken] = useState(false);
@@ -201,6 +215,7 @@ export function DashboardPageClient() {
         stored.telegramChatType
       )
     );
+    setTelegramSendAsChat(stored.telegramSendAsChat);
     setMessageTemplate(readStoredMessageTemplateContent());
     setMessageTemplateSettings(readStoredMessageTemplateSettings());
 
@@ -234,6 +249,7 @@ export function DashboardPageClient() {
             config.telegramChatType
           )
         );
+        setTelegramSendAsChat(Boolean(config.telegramSendAsChat));
 
         // Fetch bot info if we have a saved token
         if (tgToken.trim()) {
@@ -279,6 +295,7 @@ export function DashboardPageClient() {
           saveStoredTelegramConfig(tgToken, tgChatId, {
             chatTitle: config.telegramChatTitle ?? "",
             chatType: config.telegramChatType ?? "",
+            sendAsChat: Boolean(config.telegramSendAsChat),
           });
         }
       } catch {
@@ -301,6 +318,7 @@ export function DashboardPageClient() {
             storedConfig.telegramChatType
           )
         );
+        setTelegramSendAsChat(storedConfig.telegramSendAsChat);
         setMessageTemplate(readStoredMessageTemplateContent());
         setMessageTemplateSettings(readStoredMessageTemplateSettings());
       } finally {
@@ -362,6 +380,10 @@ export function DashboardPageClient() {
   function resetTelegramProgress(options?: { clearChatId?: boolean }) {
     if (options?.clearChatId) {
       setTelegramChatId("");
+      setTelegramSendAsChat(false);
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(TELEGRAM_SEND_AS_CHAT_STORAGE_KEY);
+      }
     }
 
     setTelegramLookupLoading(false);
@@ -475,9 +497,16 @@ export function DashboardPageClient() {
         return;
       }
 
+      const sendAsChatPref =
+        payload.chat.type === "private" ? false : telegramSendAsChat;
+      if (payload.chat.type === "private" && telegramSendAsChat) {
+        setTelegramSendAsChat(false);
+      }
+
       saveStoredTelegramConfig(normalizedToken, payload.chat.id, {
         chatTitle: payload.chat.title,
         chatType: payload.chat.type,
+        sendAsChat: sendAsChatPref,
       });
 
       // Push to Worker API so the cron uses these credentials
@@ -486,6 +515,7 @@ export function DashboardPageClient() {
         telegramChatId: payload.chat.id,
         telegramChatTitle: payload.chat.title,
         telegramChatType: payload.chat.type,
+        telegramSendAsChat: sendAsChatPref,
       }).catch(() => {
         // API save failed silently — will retry on next save
       });
@@ -596,6 +626,45 @@ export function DashboardPageClient() {
   const chatIsGroup = telegramValidatedChat
     ? telegramValidatedChat.type !== "private"
     : telegramChatId.startsWith("-");
+
+  async function handleSendTelegramTest() {
+    setTelegramTestStatus("loading");
+    setTelegramTestError("");
+    try {
+      await apiTelegramTest();
+      setTelegramTestStatus("ok");
+      window.setTimeout(() => setTelegramTestStatus("idle"), 4000);
+    } catch (err) {
+      setTelegramTestStatus("error");
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : t("dashboard.sendTestTelegramErrorGeneric");
+      setTelegramTestError(msg);
+    }
+  }
+
+  async function handleToggleTelegramSendAsChat(next: boolean) {
+    if (!telegramConfigured || !chatIsGroup) return;
+    const token = telegramToken.trim();
+    const chatId = telegramChatId.trim();
+    if (!token || !chatId) return;
+
+    const prev = telegramSendAsChat;
+    setTelegramSendAsChat(next);
+    saveStoredTelegramConfig(token, chatId, { sendAsChat: next });
+    setSendAsChatSaving(true);
+    try {
+      await apiUpdateConfig({ telegramSendAsChat: next });
+    } catch {
+      setTelegramSendAsChat(prev);
+      saveStoredTelegramConfig(token, chatId, { sendAsChat: prev });
+    } finally {
+      setSendAsChatSaving(false);
+    }
+  }
 
   const telegramChatStepContent = chatIdIsLocked ? (
     <div className="flex items-center gap-2">
@@ -827,6 +896,88 @@ export function DashboardPageClient() {
                 />
               </div>
             </div>
+
+            {telegramConfigured && (
+              <>
+                <Separator className="my-1" />
+                <div
+                  className={cn(
+                    "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4",
+                    !chatIsGroup && "text-muted-foreground"
+                  )}
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {t("dashboard.sendAsChatLabel")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {chatIsGroup
+                        ? t("dashboard.sendAsChatHint")
+                        : t("dashboard.sendAsChatPrivateHint")}
+                    </p>
+                  </div>
+                  {chatIsGroup ? (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={telegramSendAsChat}
+                      aria-busy={sendAsChatSaving}
+                      disabled={sendAsChatSaving}
+                      onClick={() => void handleToggleTelegramSendAsChat(!telegramSendAsChat)}
+                      className={cn(
+                        "relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-border/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        telegramSendAsChat
+                          ? "bg-emerald-600/90"
+                          : "bg-muted",
+                        sendAsChatSaving && "pointer-events-none opacity-60"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none absolute top-0.5 size-6 rounded-full bg-background shadow-sm transition-[transform]",
+                          telegramSendAsChat ? "translate-x-[1.375rem]" : "translate-x-0.5"
+                        )}
+                      />
+                    </button>
+                  ) : null}
+                </div>
+
+                <Separator className="my-1" />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {t("dashboard.sendTestTelegramTitle")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("dashboard.sendTestTelegramHint")}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="inline-flex shrink-0 gap-2"
+                    disabled={telegramTestStatus === "loading"}
+                    onClick={() => void handleSendTelegramTest()}
+                  >
+                    {telegramTestStatus === "loading" ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Send className="size-3.5" />
+                    )}
+                    <span>{t("dashboard.sendTestTelegram")}</span>
+                  </Button>
+                </div>
+                {telegramTestStatus === "ok" && (
+                  <p className="text-xs text-emerald-400">
+                    {t("dashboard.sendTestTelegramOk")}
+                  </p>
+                )}
+                {telegramTestStatus === "error" && telegramTestError && (
+                  <p className="text-xs text-amber-400">{telegramTestError}</p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 

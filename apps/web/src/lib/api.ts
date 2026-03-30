@@ -86,6 +86,8 @@ interface ConfigResponse {
   /** Présent après migration Worker D1 + déploiement */
   telegramChatTitle?: string;
   telegramChatType?: string;
+  /** Poster avec sender_chat_id (nom du groupe/canal), si le bot a les droits */
+  telegramSendAsChat?: boolean;
   messageTemplate: unknown;
   messageTemplateSettings: unknown;
   isActive: boolean;
@@ -95,11 +97,19 @@ export async function apiGetConfig(): Promise<ConfigResponse> {
   return apiFetch<ConfigResponse>("/api/config");
 }
 
+export async function apiTelegramTest(): Promise<{
+  ok: boolean;
+  sendAsChat?: boolean;
+}> {
+  return apiFetch("/api/telegram-test", { method: "POST" });
+}
+
 export async function apiUpdateConfig(data: {
   telegramToken?: string;
   telegramChatId?: string;
   telegramChatTitle?: string;
   telegramChatType?: string;
+  telegramSendAsChat?: boolean;
 }): Promise<{ ok: boolean }> {
   return apiFetch("/api/config", {
     method: "PUT",

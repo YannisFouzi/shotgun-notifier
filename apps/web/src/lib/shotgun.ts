@@ -10,6 +10,7 @@ export const TELEGRAM_TOKEN_STORAGE_KEY = "tg_token";
 export const TELEGRAM_CHAT_ID_STORAGE_KEY = "tg_chat_id";
 export const TELEGRAM_CHAT_TITLE_STORAGE_KEY = "tg_chat_title";
 export const TELEGRAM_CHAT_TYPE_STORAGE_KEY = "tg_chat_type";
+export const TELEGRAM_SEND_AS_CHAT_STORAGE_KEY = "tg_send_as_chat";
 
 const SHOTGUN_TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
@@ -165,6 +166,7 @@ export function readStoredTelegramConfig() {
       telegramChatId: "",
       telegramChatTitle: "",
       telegramChatType: "",
+      telegramSendAsChat: false,
     };
   }
 
@@ -176,13 +178,19 @@ export function readStoredTelegramConfig() {
       window.localStorage.getItem(TELEGRAM_CHAT_TITLE_STORAGE_KEY) || "",
     telegramChatType:
       window.localStorage.getItem(TELEGRAM_CHAT_TYPE_STORAGE_KEY) || "",
+    telegramSendAsChat:
+      window.localStorage.getItem(TELEGRAM_SEND_AS_CHAT_STORAGE_KEY) === "1",
   };
 }
 
 export function saveStoredTelegramConfig(
   telegramToken: string,
   telegramChatId: string,
-  meta?: { chatTitle?: string; chatType?: string } | null
+  meta?: {
+    chatTitle?: string;
+    chatType?: string;
+    sendAsChat?: boolean;
+  } | null
 ) {
   if (typeof window === "undefined") {
     return;
@@ -199,6 +207,7 @@ export function saveStoredTelegramConfig(
   if (!trimmedChatId) {
     window.localStorage.removeItem(TELEGRAM_CHAT_TITLE_STORAGE_KEY);
     window.localStorage.removeItem(TELEGRAM_CHAT_TYPE_STORAGE_KEY);
+    window.localStorage.removeItem(TELEGRAM_SEND_AS_CHAT_STORAGE_KEY);
     return;
   }
 
@@ -213,6 +222,12 @@ export function saveStoredTelegramConfig(
       window.localStorage.setItem(
         TELEGRAM_CHAT_TYPE_STORAGE_KEY,
         meta.chatType.trim()
+      );
+    }
+    if (meta.sendAsChat !== undefined) {
+      window.localStorage.setItem(
+        TELEGRAM_SEND_AS_CHAT_STORAGE_KEY,
+        meta.sendAsChat ? "1" : "0"
       );
     }
   }

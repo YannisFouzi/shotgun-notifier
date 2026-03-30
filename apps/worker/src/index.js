@@ -272,16 +272,48 @@ async function setSyncState(db, organizerId, bootstrapped, cursor) {
 // Telegram
 // ---------------------------------------------------------------------------
 
-async function sendTelegram(telegramToken, chatId, text) {
+function toTelegramIntegerChatId(chatId) {
+  const s = String(chatId || "").trim();
+  if (!/^-?\d+$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
+/** D1/SQLite peut renvoyer 0/1 en nombre ou parfois "1" en chaîne. */
+function sqliteIntFlagIsOn(value) {
+  return value === 1 || value === true || value === "1";
+}
+
+/** Groupe / supergroupe / canal uniquement (pas les MP). */
+function organizerTargetSupportsSendAsChat(organizer) {
+  const type = String(organizer.telegram_chat_type || "").toLowerCase();
+  if (type === "group" || type === "supergroup" || type === "channel") {
+    return true;
+  }
+  const id = String(organizer.telegram_chat_id || "").trim();
+  return id.startsWith("-");
+}
+
+async function sendTelegram(telegramToken, chatId, text, options) {
+  const useSenderChat =
+    options?.sendAsChat &&
+    toTelegramIntegerChatId(chatId) !== null;
+
+  const payload = {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true,
+  };
+
+  if (useSenderChat) {
+    payload.sender_chat_id = toTelegramIntegerChatId(chatId);
+  }
+
   const url = `${TELEGRAM_API_BASE}/bot${telegramToken}/sendMessage`;
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -595,6 +627,10 @@ async function syncOrganizer(db, organizer) {
   // Send notifications
   let sent = 0;
   if (organizer.telegram_token && organizer.telegram_chat_id) {
+    const sendAsChat =
+      sqliteIntFlagIsOn(organizer.telegram_send_as_chat) &&
+      organizerTargetSupportsSendAsChat(organizer);
+
     for (const notification of saleNotifications.values()) {
       const data = buildNotificationData(
         notification, eventCountCache, dealCountCache, dealsMap
@@ -604,7 +640,8 @@ async function syncOrganizer(db, organizer) {
       await sendTelegram(
         organizer.telegram_token,
         organizer.telegram_chat_id,
-        text
+        text,
+        { sendAsChat }
       );
       sent += 1;
     }
@@ -722,6 +759,7 @@ async function handleGetConfig(request, db) {
     telegramChatId: organizer.telegram_chat_id,
     telegramChatTitle: organizer.telegram_chat_title || "",
     telegramChatType: organizer.telegram_chat_type || "",
+    telegramSendAsChat: sqliteIntFlagIsOn(organizer.telegram_send_as_chat),
     messageTemplate: JSON.parse(organizer.message_template || "{}"),
     messageTemplateSettings: JSON.parse(
       organizer.message_template_settings || "{}"
@@ -754,6 +792,10 @@ async function handleUpdateConfig(request, db) {
   if (typeof body.telegramChatType === "string") {
     updates.push("telegram_chat_type = ?");
     binds.push(body.telegramChatType.trim());
+  }
+  if (typeof body.telegramSendAsChat === "boolean") {
+    updates.push("telegram_send_as_chat = ?");
+    binds.push(body.telegramSendAsChat ? 1 : 0);
   }
   if (body.messageTemplate !== undefined) {
     updates.push("message_template = ?");
@@ -848,6 +890,48 @@ async function handleUpdateTemplate(request, db) {
   return jsonResponse({ ok: true });
 }
 
+async function handleTelegramTest(request, db) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
+  const organizer = await authenticate(request, db);
+  if (!organizer) return jsonResponse({ error: "Non autorise" }, 401);
+
+  const tgToken = String(organizer.telegram_token || "").trim();
+  const tgChatId = String(organizer.telegram_chat_id || "").trim();
+  if (!tgToken || !tgChatId) {
+    return jsonResponse(
+      { error: "Telegram non configure (token et chat_id requis)" },
+      400
+    );
+  }
+
+  const sendAsChat =
+    sqliteIntFlagIsOn(organizer.telegram_send_as_chat) &&
+    organizerTargetSupportsSendAsChat(organizer);
+
+  const text = sendAsChat
+    ? "Message de test\nSi tu lis ceci, l'envoi fonctionne (expediteur : groupe ou canal)."
+    : "Message de test\nSi tu lis ceci, l'envoi Telegram fonctionne.";
+
+  try {
+    await sendTelegram(tgToken, tgChatId, text, { sendAsChat });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return jsonResponse(
+      {
+        ok: false,
+        error: msg,
+        sendAsChatAttempted: sendAsChat,
+      },
+      502
+    );
+  }
+
+  return jsonResponse({ ok: true, sendAsChat });
+}
+
 async function handleDeleteAccount(request, db) {
   const organizer = await authenticate(request, db);
   if (!organizer) return jsonResponse({ error: "Non autorise" }, 401);
@@ -872,6 +956,7 @@ function matchRoute(method, pathname) {
     { method: "POST", path: "/api/auth", handler: handleAuth },
     { method: "GET", path: "/api/config", handler: handleGetConfig },
     { method: "PUT", path: "/api/config", handler: handleUpdateConfig },
+    { method: "POST", path: "/api/telegram-test", handler: handleTelegramTest },
     { method: "GET", path: "/api/template", handler: handleGetTemplate },
     { method: "PUT", path: "/api/template", handler: handleUpdateTemplate },
     { method: "DELETE", path: "/api/account", handler: handleDeleteAccount },
