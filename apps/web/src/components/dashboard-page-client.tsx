@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { JSONContent } from "@tiptap/react";
 import { useRouter } from "next/navigation";
 import { Bot, Loader2, Pencil, User, Users } from "lucide-react";
@@ -90,6 +96,27 @@ function validatedChatFromStoredApi(
   };
 }
 
+function DashboardMainSkeleton() {
+  return (
+    <main
+      className="mx-auto max-w-6xl space-y-6 px-6 py-8"
+      aria-busy="true"
+      aria-label="Chargement du tableau de bord"
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <div className="h-8 w-56 rounded-md bg-muted/40 motion-safe:animate-pulse" />
+          <div className="h-4 w-72 max-w-full rounded-md bg-muted/30 motion-safe:animate-pulse" />
+        </div>
+        <div className="h-9 w-24 rounded-md bg-muted/40 motion-safe:animate-pulse" />
+      </div>
+      <div className="h-64 rounded-xl border border-border/30 bg-muted/10 motion-safe:animate-pulse" />
+      <div className="h-8 w-64 rounded-md bg-muted/40 motion-safe:animate-pulse" />
+      <div className="min-h-[280px] rounded-xl border border-border/30 bg-muted/10 motion-safe:animate-pulse" />
+    </main>
+  );
+}
+
 export function DashboardPageClient() {
   const router = useRouter();
   const [telegramToken, setTelegramToken] = useState("");
@@ -118,10 +145,40 @@ export function DashboardPageClient() {
   const [messageTemplateSettings, setMessageTemplateSettings] =
     useState<MessageTemplateSettings>(DEFAULT_MESSAGE_TEMPLATE_SETTINGS);
   const [readyToAutosave, setReadyToAutosave] = useState(false);
+  const [dashboardReady, setDashboardReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "pending" | "syncing" | "synced" | "error">("idle");
   const syncRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useLayoutEffect(() => {
+    const stored = readStoredTelegramConfig();
+    const hasStoredTg = Boolean(
+      stored.telegramToken.trim() && stored.telegramChatId.trim()
+    );
+
+    setTelegramToken(stored.telegramToken);
+    setTelegramChatId(stored.telegramChatId);
+    setTelegramTokenValidated(hasStoredTg);
+    setTelegramChatValidated(hasStoredTg);
+    setTelegramConfigured(hasStoredTg);
+    setTelegramConfigExpanded(!hasStoredTg);
+    setTelegramValidatedChat(
+      validatedChatFromStoredApi(
+        stored.telegramChatId,
+        stored.telegramChatTitle,
+        stored.telegramChatType
+      )
+    );
+    setMessageTemplate(readStoredMessageTemplateContent());
+    setMessageTemplateSettings(readStoredMessageTemplateSettings());
+
+    if (hasStoredTg) {
+      setDashboardReady(true);
+    }
+  }, []);
+
   useEffect(() => {
+    let cancelled = false;
+
     async function loadConfig() {
       // Try loading from API first, fall back to localStorage
       try {
@@ -213,12 +270,18 @@ export function DashboardPageClient() {
         );
         setMessageTemplate(readStoredMessageTemplateContent());
         setMessageTemplateSettings(readStoredMessageTemplateSettings());
+      } finally {
+        if (!cancelled) {
+          setDashboardReady(true);
+          setReadyToAutosave(true);
+        }
       }
-
-      setReadyToAutosave(true);
     }
 
     loadConfig();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const syncTemplateToApi = useCallback(
@@ -416,7 +479,8 @@ export function DashboardPageClient() {
   const isTelegramSetupOpen = !telegramConfigured || telegramConfigExpanded;
   const showTelegramSummaryBar = telegramConfigured && !telegramConfigExpanded;
   const showMessageTemplate = telegramConfigured;
-  const botTokenIsLocked = telegramTokenValidated && !editingBotToken && savedBotUsername;
+  const botTokenIsLocked =
+    telegramTokenValidated && !editingBotToken && Boolean(telegramToken.trim());
 
   const telegramTokenStepContent = (
     <div className="space-y-3">
@@ -424,9 +488,11 @@ export function DashboardPageClient() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-medium text-emerald-300">
             <Bot className="size-3.5" />
-            {savedBotUsername.startsWith("@")
-              ? savedBotUsername
-              : `@${savedBotUsername}`}
+            {savedBotUsername
+              ? savedBotUsername.startsWith("@")
+                ? savedBotUsername
+                : `@${savedBotUsername}`
+              : "Bot Telegram"}
           </span>
           <button
             type="button"
@@ -472,7 +538,7 @@ export function DashboardPageClient() {
               telegramLookupResult.bot.firstName}
           </span>
         )}
-        {!botTokenIsLocked && editingBotToken && savedBotUsername && (
+        {!botTokenIsLocked && editingBotToken && telegramTokenValidated && (
           <button
             type="button"
             onClick={() => setEditingBotToken(false)}
@@ -652,6 +718,7 @@ export function DashboardPageClient() {
         </div>
       </header>
 
+      {dashboardReady ? (
       <main className="mx-auto max-w-6xl space-y-6 px-6 py-8">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -737,6 +804,9 @@ export function DashboardPageClient() {
           </>
         )}
       </main>
+      ) : (
+        <DashboardMainSkeleton />
+      )}
     </div>
   );
 }
