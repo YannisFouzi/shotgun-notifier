@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslation } from "react-i18next";
 
 import { LanguageToggle } from "@/components/language-toggle";
+import { SiteFooter } from "@/components/site-footer";
 import { DEFAULT_LEGAL_CONTACT_EMAIL } from "@/lib/legal/contact";
 import type { LegalDocument } from "@/lib/legal/types";
 
@@ -22,7 +23,7 @@ export function LegalPageView({ documents }: LegalPageViewProps) {
   const contact = fromEnv || DEFAULT_LEGAL_CONTACT_EMAIL;
 
   return (
-    <div className="min-h-screen bg-[#050608] text-white">
+    <div className="flex min-h-screen flex-col bg-[#050608] text-white">
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-6 py-4">
           <nav aria-label={t("legal.backHome")}>
@@ -37,7 +38,7 @@ export function LegalPageView({ documents }: LegalPageViewProps) {
         </div>
       </header>
 
-      <article className="mx-auto max-w-3xl px-6 py-10 pb-16">
+      <article className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 pb-16">
         <h1 className="text-3xl font-semibold tracking-tight text-white">
           {doc.title}
         </h1>
@@ -76,6 +77,8 @@ export function LegalPageView({ documents }: LegalPageViewProps) {
           ))}
         </div>
       </article>
+
+      <SiteFooter variant="home" />
     </div>
   );
 }
