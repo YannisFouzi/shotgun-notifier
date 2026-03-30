@@ -720,6 +720,8 @@ async function handleGetConfig(request, db) {
     organizerId: organizer.id,
     telegramToken: organizer.telegram_token,
     telegramChatId: organizer.telegram_chat_id,
+    telegramChatTitle: organizer.telegram_chat_title || "",
+    telegramChatType: organizer.telegram_chat_type || "",
     messageTemplate: JSON.parse(organizer.message_template || "{}"),
     messageTemplateSettings: JSON.parse(
       organizer.message_template_settings || "{}"
@@ -744,6 +746,14 @@ async function handleUpdateConfig(request, db) {
   if (typeof body.telegramChatId === "string") {
     updates.push("telegram_chat_id = ?");
     binds.push(body.telegramChatId.trim());
+  }
+  if (typeof body.telegramChatTitle === "string") {
+    updates.push("telegram_chat_title = ?");
+    binds.push(body.telegramChatTitle.trim());
+  }
+  if (typeof body.telegramChatType === "string") {
+    updates.push("telegram_chat_type = ?");
+    binds.push(body.telegramChatType.trim());
   }
   if (body.messageTemplate !== undefined) {
     updates.push("message_template = ?");

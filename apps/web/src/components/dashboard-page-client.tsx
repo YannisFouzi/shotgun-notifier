@@ -52,6 +52,44 @@ interface TelegramValidatedChatResult {
   chat: TelegramDetectedChat;
 }
 
+const TELEGRAM_CHAT_TYPES: TelegramDetectedChat["type"][] = [
+  "private",
+  "group",
+  "supergroup",
+  "channel",
+];
+
+function validatedChatFromStoredApi(
+  chatId: string,
+  title: string | undefined,
+  type: string | undefined
+): TelegramDetectedChat | null {
+  const id = chatId.trim();
+  if (!id) {
+    return null;
+  }
+
+  const rawType = (type || "").trim();
+  const chatType = TELEGRAM_CHAT_TYPES.includes(
+    rawType as TelegramDetectedChat["type"]
+  )
+    ? (rawType as TelegramDetectedChat["type"])
+    : id.startsWith("-")
+      ? "supergroup"
+      : "private";
+
+  const displayTitle = (title || "").trim() || id;
+  const subtitle =
+    chatType === "private" ? "Conversation privee" : "Groupe";
+
+  return {
+    id,
+    type: chatType,
+    title: displayTitle,
+    subtitle,
+  };
+}
+
 export function DashboardPageClient() {
   const router = useRouter();
   const [telegramToken, setTelegramToken] = useState("");
@@ -99,6 +137,14 @@ export function DashboardPageClient() {
         setTelegramConfigured(hasConfig);
         setTelegramConfigExpanded(!hasConfig);
 
+        setTelegramValidatedChat(
+          validatedChatFromStoredApi(
+            tgChatId,
+            config.telegramChatTitle,
+            config.telegramChatType
+          )
+        );
+
         // Fetch bot info if we have a saved token
         if (tgToken.trim()) {
           fetch("/api/telegram/discover", {
@@ -112,6 +158,13 @@ export function DashboardPageClient() {
               if ("bot" in result && result.bot) {
                 setSavedBotUsername(result.bot.username || result.bot.firstName);
                 setTelegramLookupResult(result);
+                const cid = tgChatId.trim();
+                if (cid && "chats" in result && Array.isArray(result.chats)) {
+                  const found = result.chats.find((c) => c.id === cid);
+                  if (found) {
+                    setTelegramValidatedChat(found);
+                  }
+                }
               }
             })
             .catch(() => {});
@@ -133,7 +186,10 @@ export function DashboardPageClient() {
 
         // Sync to localStorage as cache
         if (tgToken || tgChatId) {
-          saveStoredTelegramConfig(tgToken, tgChatId);
+          saveStoredTelegramConfig(tgToken, tgChatId, {
+            chatTitle: config.telegramChatTitle ?? "",
+            chatType: config.telegramChatType ?? "",
+          });
         }
       } catch {
         // API unavailable — fall back to localStorage
@@ -148,6 +204,13 @@ export function DashboardPageClient() {
         setTelegramChatValidated(hasStoredTelegramConfig);
         setTelegramConfigured(hasStoredTelegramConfig);
         setTelegramConfigExpanded(!hasStoredTelegramConfig);
+        setTelegramValidatedChat(
+          validatedChatFromStoredApi(
+            storedConfig.telegramChatId,
+            storedConfig.telegramChatTitle,
+            storedConfig.telegramChatType
+          )
+        );
         setMessageTemplate(readStoredMessageTemplateContent());
         setMessageTemplateSettings(readStoredMessageTemplateSettings());
       }
@@ -314,12 +377,17 @@ export function DashboardPageClient() {
         return;
       }
 
-      saveStoredTelegramConfig(normalizedToken, payload.chat.id);
+      saveStoredTelegramConfig(normalizedToken, payload.chat.id, {
+        chatTitle: payload.chat.title,
+        chatType: payload.chat.type,
+      });
 
       // Push to Worker API so the cron uses these credentials
       apiUpdateConfig({
         telegramToken: normalizedToken,
         telegramChatId: payload.chat.id,
+        telegramChatTitle: payload.chat.title,
+        telegramChatType: payload.chat.type,
       }).catch(() => {
         // API save failed silently — will retry on next save
       });
@@ -350,52 +418,61 @@ export function DashboardPageClient() {
   const showMessageTemplate = telegramConfigured;
   const botTokenIsLocked = telegramTokenValidated && !editingBotToken && savedBotUsername;
 
-  const telegramTokenStepContent = botTokenIsLocked ? (
-    <div className="flex items-center gap-2">
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-medium text-emerald-300">
-        <Bot className="size-3.5" />
-        {savedBotUsername.startsWith("@") ? savedBotUsername : `@${savedBotUsername}`}
-      </span>
-      <button
-        type="button"
-        onClick={() => setEditingBotToken(true)}
-        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <Pencil className="size-3" />
-        Modifier
-      </button>
-    </div>
-  ) : (
+  const telegramTokenStepContent = (
     <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label htmlFor="tg-token">Bot Token</Label>
-        <Input
-          id="tg-token"
-          type="password"
-          placeholder="7103948261:AAF..."
-          value={telegramToken}
-          onChange={(event) => {
-            setTelegramToken(event.target.value);
-            resetTelegramProgress({ clearChatId: true });
-          }}
-        />
-      </div>
+      {botTokenIsLocked ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-medium text-emerald-300">
+            <Bot className="size-3.5" />
+            {savedBotUsername.startsWith("@")
+              ? savedBotUsername
+              : `@${savedBotUsername}`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditingBotToken(true)}
+            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Pencil className="size-3" />
+            Modifier
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <Label htmlFor="tg-token">Bot Token</Label>
+          <Input
+            id="tg-token"
+            type="password"
+            placeholder="7103948261:AAF..."
+            value={telegramToken}
+            onChange={(event) => {
+              setTelegramToken(event.target.value);
+              resetTelegramProgress({ clearChatId: true });
+            }}
+          />
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <Button
+          type="button"
           onClick={handleTelegramDetectChats}
           size="sm"
           disabled={telegramLookupLoading || !telegramToken.trim()}
         >
-          {telegramLookupLoading && <Loader2 className="size-3.5 animate-spin" />}
-          {telegramTokenValidated ? "Actualiser les chats" : "Valider le bot"}
+          {telegramLookupLoading && (
+            <Loader2 className="size-3.5 animate-spin" />
+          )}
+          Détecter mes chats
         </Button>
-        {telegramLookupResult?.bot && (
+        {telegramLookupResult?.bot && !botTokenIsLocked && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
             <Bot className="size-3.5" />
-            {telegramLookupResult.bot.username || telegramLookupResult.bot.firstName}
+            {telegramLookupResult.bot.username ||
+              telegramLookupResult.bot.firstName}
           </span>
         )}
-        {editingBotToken && savedBotUsername && (
+        {!botTokenIsLocked && editingBotToken && savedBotUsername && (
           <button
             type="button"
             onClick={() => setEditingBotToken(false)}
@@ -405,6 +482,7 @@ export function DashboardPageClient() {
           </button>
         )}
       </div>
+
       {telegramLookupError && (
         <p className="text-xs text-amber-400">{telegramLookupError}</p>
       )}

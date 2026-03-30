@@ -8,6 +8,8 @@ export const SHOTGUN_TOKEN_STORAGE_KEY = "sg_token";
 export const SHOTGUN_TOKEN_COOKIE_KEY = SHOTGUN_TOKEN_STORAGE_KEY;
 export const TELEGRAM_TOKEN_STORAGE_KEY = "tg_token";
 export const TELEGRAM_CHAT_ID_STORAGE_KEY = "tg_chat_id";
+export const TELEGRAM_CHAT_TITLE_STORAGE_KEY = "tg_chat_title";
+export const TELEGRAM_CHAT_TYPE_STORAGE_KEY = "tg_chat_type";
 
 const SHOTGUN_TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
@@ -158,19 +160,29 @@ export function clearStoredShotgunToken() {
 
 export function readStoredTelegramConfig() {
   if (typeof window === "undefined") {
-    return { telegramToken: "", telegramChatId: "" };
+    return {
+      telegramToken: "",
+      telegramChatId: "",
+      telegramChatTitle: "",
+      telegramChatType: "",
+    };
   }
 
   return {
     telegramToken: window.localStorage.getItem(TELEGRAM_TOKEN_STORAGE_KEY) || "",
     telegramChatId:
       window.localStorage.getItem(TELEGRAM_CHAT_ID_STORAGE_KEY) || "",
+    telegramChatTitle:
+      window.localStorage.getItem(TELEGRAM_CHAT_TITLE_STORAGE_KEY) || "",
+    telegramChatType:
+      window.localStorage.getItem(TELEGRAM_CHAT_TYPE_STORAGE_KEY) || "",
   };
 }
 
 export function saveStoredTelegramConfig(
   telegramToken: string,
-  telegramChatId: string
+  telegramChatId: string,
+  meta?: { chatTitle?: string; chatType?: string } | null
 ) {
   if (typeof window === "undefined") {
     return;
@@ -180,8 +192,28 @@ export function saveStoredTelegramConfig(
     TELEGRAM_TOKEN_STORAGE_KEY,
     telegramToken.trim()
   );
-  window.localStorage.setItem(
-    TELEGRAM_CHAT_ID_STORAGE_KEY,
-    telegramChatId.trim()
-  );
+
+  const trimmedChatId = telegramChatId.trim();
+  window.localStorage.setItem(TELEGRAM_CHAT_ID_STORAGE_KEY, trimmedChatId);
+
+  if (!trimmedChatId) {
+    window.localStorage.removeItem(TELEGRAM_CHAT_TITLE_STORAGE_KEY);
+    window.localStorage.removeItem(TELEGRAM_CHAT_TYPE_STORAGE_KEY);
+    return;
+  }
+
+  if (meta) {
+    if (meta.chatTitle !== undefined) {
+      window.localStorage.setItem(
+        TELEGRAM_CHAT_TITLE_STORAGE_KEY,
+        meta.chatTitle.trim()
+      );
+    }
+    if (meta.chatType !== undefined) {
+      window.localStorage.setItem(
+        TELEGRAM_CHAT_TYPE_STORAGE_KEY,
+        meta.chatType.trim()
+      );
+    }
+  }
 }

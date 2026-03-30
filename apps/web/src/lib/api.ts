@@ -83,6 +83,9 @@ interface ConfigResponse {
   organizerId: string;
   telegramToken: string;
   telegramChatId: string;
+  /** Présent après migration Worker D1 + déploiement */
+  telegramChatTitle?: string;
+  telegramChatType?: string;
   messageTemplate: unknown;
   messageTemplateSettings: unknown;
   isActive: boolean;
@@ -95,6 +98,8 @@ export async function apiGetConfig(): Promise<ConfigResponse> {
 export async function apiUpdateConfig(data: {
   telegramToken?: string;
   telegramChatId?: string;
+  telegramChatTitle?: string;
+  telegramChatType?: string;
 }): Promise<{ ok: boolean }> {
   return apiFetch("/api/config", {
     method: "PUT",
