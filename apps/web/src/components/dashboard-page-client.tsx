@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageTemplateEditor } from "@/components/message-template-editor";
 import { ChannelSetupGuide } from "@/components/channel-setup-guide";
+import { DeleteAccountSection } from "@/components/delete-account-dialog";
 import { LanguageToggle } from "@/components/language-toggle";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -854,6 +855,8 @@ export function DashboardPageClient() {
             </Card>
           </>
         )}
+
+        <DeleteAccountSection />
       </main>
       ) : (
         <DashboardMainSkeleton />

@@ -53,7 +53,19 @@
     "errPickChatId": "Choose or enter a Chat ID.",
     "errVerifyBot": "Could not verify this Telegram bot.",
     "errContactTelegram": "Could not reach Telegram.",
-    "errValidateChat": "Could not validate this Telegram chat."
+    "errValidateChat": "Could not validate this Telegram chat.",
+    "deleteAccountZoneTitle": "Danger zone",
+    "deleteAccountZoneHint": "Permanently deletes ShotNotif data held on our servers. This cannot be undone.",
+    "deleteAccountOpen": "Delete account",
+    "deleteAccountDialogTitle": "Delete your account?",
+    "deleteAccountDialogBody": "Your Shotgun account is unchanged. ShotNotif data we host will be permanently removed and cannot be restored.",
+    "deleteAccountTypeLabel": "Type <strong>{{word}}</strong> to confirm",
+    "deleteAccountConfirmWord": "DELETE",
+    "deleteAccountConfirmPlaceholder": "DELETE",
+    "deleteAccountCancel": "Cancel",
+    "deleteAccountSubmit": "Delete permanently",
+    "deleteAccountSubmitting": "Deleting…",
+    "deleteAccountError": "Could not delete the account. Try again."
   },
   "errors": {
     "telegram": {

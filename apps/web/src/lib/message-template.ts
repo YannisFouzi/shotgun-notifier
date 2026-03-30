@@ -117,3 +117,9 @@ export function saveStoredMessageTemplateSettings(
     JSON.stringify(normalizeMessageTemplateSettings(settings))
   );
 }
+
+export function clearStoredMessageTemplate() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(MESSAGE_TEMPLATE_STORAGE_KEY);
+  window.localStorage.removeItem(MESSAGE_TEMPLATE_SETTINGS_STORAGE_KEY);
+}

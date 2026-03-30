@@ -53,7 +53,19 @@
     "errPickChatId": "Choisissez ou renseignez un Chat ID.",
     "errVerifyBot": "Impossible de vérifier ce bot Telegram.",
     "errContactTelegram": "Impossible de contacter Telegram.",
-    "errValidateChat": "Impossible de valider ce chat Telegram."
+    "errValidateChat": "Impossible de valider ce chat Telegram.",
+    "deleteAccountZoneTitle": "Zone sensible",
+    "deleteAccountZoneHint": "Suppression définitive des données ShotNotif conservées sur nos serveurs. Opération irréversible.",
+    "deleteAccountOpen": "Supprimer le compte",
+    "deleteAccountDialogTitle": "Supprimer votre compte ?",
+    "deleteAccountDialogBody": "Votre compte Shotgun n’est pas modifié. Les données ShotNotif hébergées chez nous seront supprimées sans possibilité de restauration.",
+    "deleteAccountTypeLabel": "Tapez <strong>{{word}}</strong> pour confirmer",
+    "deleteAccountConfirmWord": "DELETE",
+    "deleteAccountConfirmPlaceholder": "DELETE",
+    "deleteAccountCancel": "Annuler",
+    "deleteAccountSubmit": "Supprimer définitivement",
+    "deleteAccountSubmitting": "Suppression…",
+    "deleteAccountError": "Impossible de supprimer le compte. Réessayez."
   },
   "errors": {
     "telegram": {
