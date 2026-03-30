@@ -1,157 +1,306 @@
 # ShotNotif
 
-Notifications pour chaque nouvelle vente de billet sur [Shotgun.live](https://shotgun.live), avec **polling planifié** sur Cloudflare Workers, persistance **Cloudflare D1**, et **dashboard Next.js** pour lier Telegram et éditer le message (même logique de rendu que le Worker grâce au package partagé).
+**Notifications Telegram en temps quasi réel** pour chaque nouvelle vente comptabilisée sur [Shotgun.live](https://shotgun.live), avec **polling planifié** (Cloudflare Workers + cron), persistance **D1**, et **dashboard Next.js** (configuration bot, éditeur de message TipTap). Le rendu des messages est **partagé** entre le Worker et le front via `@shotgun-notifier/shared`.
+
+| | |
+|---|---|
+| **Worker (runtime)** | `shotgun-notifier-v3` — `apps/worker/src/index.js` |
+| **Monorepo** | npm workspaces (`apps/*`, `packages/*`), Turborepo optionnel |
+| **Doc** | README v3 — aligné sur le code au **29 mars 2026** |
 
 ---
 
 ## Sommaire
 
-- [Vue d’ensemble](#vue-densemble)
-- [Architecture](#architecture)
-- [Structure du dépôt](#structure-du-dépôt)
-- [Stack technique](#stack-technique)
-- [Prérequis](#prérequis)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Base Cloudflare D1](#base-cloudflare-d1)
-- [Développement local](#développement-local)
-- [API du Worker](#api-du-worker)
-- [Comportement du cron (sync Shotgun → Telegram)](#comportement-du-cron-sync-shotgun--telegram)
-- [Application web (Next.js)](#application-web-nextjs)
-- [Déploiement](#déploiement)
-- [Sécurité et données sensibles](#sécurité-et-données-sensibles)
-- [Dépannage](#dépannage)
-- [Licence](#licence)
+1. [Produit & cas d’usage](#1-produit--cas-dusage)
+2. [Architecture](#2-architecture)
+3. [Structure du dépôt](#3-structure-du-dépôt)
+4. [Stack technique](#4-stack-technique)
+5. [Modèle de données (D1)](#5-modèle-de-données-d1)
+6. [Worker — détail d’implémentation](#6-worker--détail-dimplémentation)
+7. [API REST du Worker](#7-api-rest-du-worker)
+8. [Package `@shotgun-notifier/shared`](#8-package-shotgun-notifiershared)
+9. [Application web (Next.js)](#9-application-web-nextjs)
+10. [Internationalisation (i18n)](#10-internationalisation-i18n)
+11. [Variables d’environnement](#11-variables-denvironnement)
+12. [Installation & développement local](#12-installation--développement-local)
+13. [Déploiement production](#13-déploiement-production)
+14. [Observabilité](#14-observabilité)
+15. [Sécurité & menaces](#15-sécurité--menaces)
+16. [Dépannage](#16-dépannage)
+17. [Licence](#17-licence)
 
 ---
 
-## Vue d’ensemble
+## 1. Produit & cas d’usage
 
-1. L’organisateur se connecte au site avec son **token API Shotgun** (JWT Smartboard — même famille que *Settings → Integrations*).
-2. Le Worker enregistre l’organisateur en **D1** (`organizers`) et, à chaque minute (**cron**), interroge l’API Shotgun pour les **événements** et les **tickets**.
-3. **Premier passage** : *bootstrap* — import massif de l’historique des tickets comptabilisables, **sans envoi Telegram**.
-4. **Passes suivantes** : sync incrémental via **curseur** (`sync_state`) ; les **nouvelles ventes** déclenchent un `sendMessage` Telegram vers **un seul** `chat_id` configuré (privé, groupe ou supergroupe).
-5. Le **texte** du message est rendu depuis un document **TipTap** (JSON) et des **variables** Shotgun, via `@shotgun-notifier/shared` — **même code** côté Worker et côté prévisualisation web.
+1. L’organisateur ouvre le site, colle son **JWT API Shotgun** (Smartboard — même famille que *Paramètres → Integrations* sur Shotgun).
+2. Le **Worker** valide le token contre l’API Shotgun, **upsert** une ligne `organizers` en D1.
+3. Un **cron chaque minute** interroge l’API tickets Shotgun, met à jour les compteurs et détecte les **nouveaux** billets aux statuts comptés (`valid`, `resold`).
+4. **Premier cycle** : *bootstrap* — import historique (plafonné en pages par événement), **sans** Telegram.
+5. **Cycles suivants** : sync incrémental + **une notification Telegram par événement** ayant eu des ventes sur ce run, avec texte issu du **template TipTap** (JSON) + variables métier.
 
-Version logique du Worker dans le code : `shotgun-notifier-v3` (`apps/worker/src/index.js`).
-
----
-
-## Architecture
-
-```
-┌─────────────────┐     Bearer: JWT Shotgun      ┌──────────────────────────────┐
-│  Next.js (web)  │ ─────────────────────────► │  Cloudflare Worker           │
-│  + routes       │     NEXT_PUBLIC_API_URL      │  fetch() + scheduled()       │
-│    /api/telegram│                              │  binding: DB (D1)            │
-└────────┬────────┘                              └───────────┬──────────────────┘
-         │                                                    │
-         │ discover / validate-chat                           │ cron * * * * *
-         ▼                                                    ▼
-┌─────────────────┐                              ┌──────────────────────────────┐
-│  api.telegram.org│                              │  api.shotgun.live /          │
-│  (Bot API)      │                              │  smartboard-api.shotgun.live │
-└─────────────────┘                              └──────────────────────────────┘
-```
-
-- **Auth “métier”** : le JWT Shotgun sert à la fois d’identifiant (`organizerId` dans le payload) et de secret : le Worker compare le `Bearer` à `organizers.shotgun_token`.
-- Les routes Next `/api/telegram/*` **ne stockent rien** : elles proxifient **getMe / getUpdates / validation de chat** vers Telegram pour le confort du dashboard.
+**Contraintes actuelles** : une destination Telegram par organisateur (`telegram_chat_id` unique) ; pas de file multi-canal en prod (WhatsApp / Discord / Messenger sont surtout préparés côté UI).
 
 ---
 
-## Structure du dépôt
+## 2. Architecture
 
-```
-apps/
-  worker/                 # Cloudflare Worker (point d’entrée : src/index.js)
-    migrations/           # SQL D1 (schéma initial)
-    src/
-      index.js            # Cron + router HTTP REST
-      worker_v2.old.js    # Ancienne implémentation KV (référence / historique)
-  web/                    # Next.js 16 — landing, dashboard, éditeur de template
-packages/
-  shared/                 # Templates TipTap, variables, rendu texte (Worker + Web)
+```mermaid
+flowchart LR
+  subgraph client["Navigateur"]
+    WEB["Next.js — ShotNotif"]
+  end
+  subgraph cf["Cloudflare"]
+    W["Worker + D1"]
+    CRON["Cron * * * * *"]
+  end
+  subgraph ext["Services externes"]
+    SG["Shotgun API\n(events / tickets)"]
+    TG["Telegram Bot API"]
+  end
+  WEB -->|"Bearer JWT Shotgun\nNEXT_PUBLIC_API_URL"| W
+  WEB -->|"discover / validate-chat\nroutes Next.js"| TG
+  CRON --> W
+  W --> SG
+  W --> TG
 ```
 
-Monorepo **npm workspaces** ; orchestration dev/build optionnelle avec **Turborepo** (`turbo.json`).
+| Flux | Rôle |
+|------|------|
+| **Auth métier** | Le JWT Shotgun sert d’identité (`organizerId` dans le payload) *et* de secret : toute route protégée vérifie `Bearer === organizers.shotgun_token`. |
+| **Routes Next `/api/telegram/*`** | Appellent **uniquement** l’API Telegram (`getMe`, `getUpdates`, `getChat`, etc.) pour le confort du dashboard ; **aucune** persistance métier côté Next. |
+| **Config & template** | Le dashboard écrit la vérité sur le Worker (`PUT /api/config`, `PUT /api/template`) ; le client garde aussi un **cache** `localStorage` pour résilience offline. |
 
 ---
 
-## Stack technique
+## 3. Structure du dépôt
 
-| Zone | Technologies |
-|------|----------------|
-| Worker | Cloudflare Workers, **D1**, Cron Triggers, fetch vers Shotgun + Telegram |
-| Web | Next.js 16, React 19, TypeScript, Tailwind CSS v4, TipTap, shadcn-style UI |
-| Partagé | `@shotgun-notifier/shared` — types, contenu JSON par défaut, `renderMessageTemplateWithData`, etc. |
-| Outils | Wrangler 4.x, ESLint |
+```
+telegramShotgun/
+├── apps/
+│   ├── worker/
+│   │   ├── wrangler.jsonc          # binding D1, cron, observabilité
+│   │   ├── migrations/
+│   │   │   ├── 0001_initial.sql    # schéma principal
+│   │   │   └── 0002_telegram_chat_display.sql
+│   │   └── src/
+│   │       ├── index.js            # fetch + scheduled + logique sync
+│   │       └── worker_v2.old.js    # historique (KV) — non utilisé en prod
+│   └── web/
+│       ├── src/
+│       │   ├── app/                # App Router Next.js 16
+│       │   ├── components/         # dashboard, éditeur, mockups, i18n
+│       │   ├── lib/                # api, shotgun, message-template, i18n
+│       │   └── locales/            # en.json, fr.json
+│       └── package.json
+├── packages/
+│   └── shared/                     # @shotgun-notifier/shared
+│       └── src/
+│           ├── message-template.ts # TipTap JSON, variables, rendu
+│           └── version.ts
+├── package.json                    # workspaces racine
+├── turbo.json
+└── README.md
+```
 
 ---
 
-## Prérequis
+## 4. Stack technique
 
-- **Node.js** récent (LTS recommandé)
-- Compte **Cloudflare** avec Workers + **D1**
-- **Token API Shotgun** (JWT organisateur)
-- **Bot Telegram** (@BotFather) et un **chat_id** cible (une destination à la fois dans la config actuelle)
+| Couche | Technologies |
+|--------|----------------|
+| **Worker** | Cloudflare Workers, **D1**, Cron Triggers, `fetch` vers `api.shotgun.live` + Smartboard + Telegram |
+| **Web** | **Next.js 16**, **React 19**, TypeScript, **Tailwind CSS 4**, TipTap 3, UI type shadcn / Base UI |
+| **i18n** | `i18next`, `react-i18next` — **en** / **fr**, init SSR-safe puis sync `localStorage` + `navigator` après hydratation |
+| **Partagé** | `@shotgun-notifier/shared` — JSON TipTap, `renderMessageTemplateWithData` / `Preview`, normalisation settings |
+| **Tooling** | Wrangler 4.x, ESLint, Turborepo (tâches `dev` / `build`) |
 
 ---
 
-## Installation
+## 5. Modèle de données (D1)
 
-À la racine du dépôt :
+Migrations dans `apps/worker/migrations/`. Après clonage, adapter **`database_name`** / **`database_id`** dans `wrangler.jsonc` à **votre** base D1.
+
+### `organizers`
+
+| Colonne | Description |
+|---------|-------------|
+| `id` | `organizer_id` extrait du JWT Shotgun (PK) |
+| `shotgun_token` | JWT complet (secret de session API) |
+| `telegram_token` | Token bot |
+| `telegram_chat_id` | Chat cible |
+| `telegram_chat_title` | Libellé affichable (migration `0002`) |
+| `telegram_chat_type` | Type Telegram (`private`, `group`, …) |
+| `message_template` | JSON TipTap (`doc`) |
+| `message_template_settings` | JSON (ex. `showEventNameOnlyWhenMultipleEvents`) |
+| `is_active` | `1` = pris en compte par le cron |
+| `created_at` / `updated_at` | Horodatage SQLite |
+
+### `sync_state`
+
+| Colonne | Description |
+|---------|-------------|
+| `organizer_id` | FK → `organizers` |
+| `bootstrapped` | `0` → passage bootstrap ; `1` → sync incrémental |
+| `cursor` | Curseur tickets Shotgun (`updatedAt_ticketId`) |
+
+### `tickets`
+
+Suivi par billet : `counted` pour savoir si une vente a déjà été notifiée.
+
+### `event_counts` / `deal_counts`
+
+Agrégats vendus par événement et par vague / type de billet.
+
+**Commandes** (depuis `apps/worker`) :
+
+```bash
+npm run db:migrate:local    # D1 locale (wrangler dev)
+npm run db:migrate:remote   # D1 production
+```
+
+---
+
+## 6. Worker — détail d’implémentation
+
+### Constantes notables (`index.js`)
+
+| Constante | Valeur | Rôle |
+|-----------|--------|------|
+| `VERSION` | `shotgun-notifier-v3` | Health + logs |
+| `BOOTSTRAP_MAX_PAGES` | `200` | Plafond de pages tickets **par événement** au bootstrap |
+| `SYNC_MAX_PAGES_PER_RUN` | `10` | Pages tickets max **par événement** par minute de cron |
+| `COUNTED_STATUSES` | `valid`, `resold` | Statuts Shotgun pris en compte pour les ventes |
+
+### APIs Shotgun utilisées
+
+- **Liste événements** : `GET https://smartboard-api.shotgun.live/api/shotgun/organizers/{id}/events?key={token}` (auth login + métadonnées deals).
+- **Tickets** : `GET https://api.shotgun.live/tickets` avec `organizer_id`, `event_id`, `include_cohosted_events`, pagination `after`.
+
+### Telegram
+
+- `POST https://api.telegram.org/bot{token}/sendMessage` avec `disable_web_page_preview: true`.
+- Si `telegram_token` ou `telegram_chat_id` vide → sync silencieux (pas d’envoi).
+
+### Rendu message
+
+- `renderMessageTemplateWithData` depuis `@shotgun-notifier/shared`.
+- Si le rendu est vide → fallback texte minimal incl. **`Nouvelle vente ShotNotif`** + lignes synthétiques.
+
+### Cron
+
+Déclaré dans `wrangler.jsonc` : `"crons": ["* * * * *"]` (chaque minute). Handler : `scheduled` → `runCron(env.DB)`.
+
+---
+
+## 7. API REST du Worker
+
+**Base URL** : URL de déploiement Worker (HTTPS).
+
+**CORS** : `Access-Control-Allow-Origin: *` ; méthodes `GET, POST, PUT, DELETE, OPTIONS` ; en-têtes `Content-Type, Authorization`.
+
+| Méthode | Chemin | Auth | Description |
+|---------|--------|------|-------------|
+| `GET` | `/` ou `/health` | Non | `{ ok: true, version }` |
+| `OPTIONS` | `*` | Non | Préflight CORS |
+| `POST` | `/api/auth` | Non | Body `{ "token": "<JWT Shotgun>" }` — valide Shotgun, upsert `organizers` |
+| `GET` | `/api/config` | Bearer | Lit config Telegram + template + settings + `telegramChatTitle` / `Type` |
+| `PUT` | `/api/config` | Bearer | Met à jour champs partiels (`telegramToken`, `telegramChatId`, `telegramChatTitle`, `telegramChatType`, optionnellement template) |
+| `GET` | `/api/template` | Bearer | Template TipTap normalisé + settings |
+| `PUT` | `/api/template` | Bearer | Met à jour `messageTemplate` / `messageTemplateSettings` |
+| `DELETE` | `/api/account` | Bearer | Supprime l’organisateur et données associées (batch SQL) |
+
+**Auth** : `Authorization: Bearer <JWT>` doit **exactement** égaler `organizers.shotgun_token` pour l’`organizerId` dérivé du JWT.
+
+---
+
+## 8. Package `@shotgun-notifier/shared`
+
+Runtime **sans dépendance lourde** (Worker + navigateur) :
+
+- Types et métadonnées des **sections** / **variables** de template.
+- `DEFAULT_MESSAGE_TEMPLATE_CONTENT`, `MESSAGE_TEMPLATE_PRESETS`, `SAMPLE_MESSAGE_TEMPLATE_CONTEXT`.
+- `renderMessageTemplatePreview` (UI), `renderMessageTemplateWithData` (Worker), `serializeMessageTemplate`, `extractMessageTemplateVariableKeys`.
+- `normalizeMessageTemplateSettings`, `createMessageTemplateVariableNode` (label override pour i18n côté web).
+
+`VERSION` exportée depuis `packages/shared/src/version.ts` (alignée conceptuellement sur le Worker).
+
+---
+
+## 9. Application web (Next.js)
+
+### Routes App Router
+
+| Route | Composant / rôle |
+|-------|------------------|
+| `/` | Landing + login JWT Shotgun → `apiLogin` → `localStorage` + cookie `sg_token` |
+| `/dashboard` | Config Telegram, guide BotFather, éditeur TipTap, preview Telegram |
+| `/dashboard/setup` | Redirige vers `/dashboard` |
+
+### Routes API Next (Edge/Node selon build)
+
+| Route | Rôle |
+|-------|------|
+| `POST /api/telegram/discover` | `getMe` + `getUpdates` — liste chats récents ; erreur **409** si webhook actif |
+| `POST /api/telegram/validate-chat` | Vérifie que le bot peut parler au `chat_id` |
+
+Réponses structurées avec `error` + `errorKey` pour l’i18n côté client (`telegram.subtitle.*`, `errors.telegram.*`).
+
+### Client stockage (`localStorage`)
+
+| Clé | Usage |
+|-----|--------|
+| `sg_token` | JWT Shotgun (+ cookie miroir `SameSite=Lax`) |
+| `tg_token`, `tg_chat_id`, `tg_chat_title`, `tg_chat_type` | Cache config Telegram |
+| `message_template`, `message_template_settings` | Cache éditeur |
+| `shotgun-notifier-locale` | Préférence **en** / **fr** (i18n) |
+
+### Éditeur & sync
+
+- Modifications template : sauvegarde **immédiate** locale + **debounce ~1,5 s** vers `PUT /api/template`.
+- Composant **`SyncIndicator`** : états idle / pending / syncing / synced / error + retry.
+
+---
+
+## 10. Internationalisation (i18n)
+
+- Langues : **anglais** et **français**.
+- Fichiers : `apps/web/src/locales/en.json`, `fr.json`.
+- **Hydratation** : `i18n` est initialisé en **`lng: "en"`** de façon déterministe ; `AppI18nProvider` applique la langue persistée / navigateur dans un **`useLayoutEffect`** après hydratation, puis persiste sur `languageChanged`.
+- Marque produit affichée : **ShotNotif** (mockups BotFather restent en **anglais** pour éviter débordement UI).
+
+---
+
+## 11. Variables d’environnement
+
+### `apps/web`
+
+| Variable | Obligatoire prod | Description |
+|----------|------------------|-------------|
+| `NEXT_PUBLIC_API_URL` | **Oui** | URL du Worker **sans** slash final (ex. `https://notifshotgun.<subdomain>.workers.dev`). Sinon fallback placeholder dans `src/lib/api.ts` — **à remplacer**. |
+
+### `apps/worker`
+
+La logique **v3** lit tokens Telegram, chat_id et templates depuis **D1**, pas depuis des secrets Wrangler pour le cron. Les secrets globaux type `TELEGRAM_*` / `SG_TOKEN` relèvent d’**anciens** déploiements (cf. `worker_v2.old.js`).
+
+---
+
+## 12. Installation & développement local
+
+### Prérequis
+
+- **Node.js** LTS récent  
+- Compte **Cloudflare** (Workers + D1)  
+- Token **Shotgun** + bot **Telegram**
+
+### Installation
 
 ```bash
 npm install
 ```
 
----
-
-## Configuration
-
-### Application web (`apps/web`)
-
-| Variable | Rôle |
-|----------|------|
-| `NEXT_PUBLIC_API_URL` | URL **complète** du Worker (sans slash final), ex. `https://notifshotgun.<sous-domaine>.workers.dev` |
-
-Sans cette variable, le client utilise le placeholder défini dans `apps/web/src/lib/api.ts` — à remplacer impérativement en production.
-
-### Worker (`apps/worker`)
-
-Le runtime du cron **ne lit pas** `TELEGRAM_TOKEN` / `TELEGRAM_CHAT_ID` / `SG_TOKEN` dans les secrets Wrangler pour la logique v3 : tout est lu depuis **D1** (`organizers`), alimenté par `POST /api/auth` et `PUT /api/config` depuis le dashboard.
-
-> Le fichier `apps/worker/.env.example` peut encore mentionner d’anciennes variables « tout en env » : elles correspondent à l’**ancien** modèle (ex. `worker_v2.old.js`), pas au Worker `index.js` actuel.
-
----
-
-## Base Cloudflare D1
-
-Schéma défini dans `apps/worker/migrations/0001_initial.sql` :
-
-| Table | Rôle |
-|-------|------|
-| `organizers` | Un organisateur : `shotgun_token`, `telegram_token`, `telegram_chat_id`, `message_template`, `message_template_settings`, `is_active` |
-| `sync_state` | `bootstrapped`, `cursor` incrémental par organisateur |
-| `tickets` | Suivi par billet (`counted` / statuts valides + revendus) |
-| `event_counts` | Total vendus par événement |
-| `deal_counts` | Compteurs par vague / type de billet |
-
-Appliquer les migrations :
-
-```bash
-cd apps/worker
-npm run db:migrate:local    # D1 local (wrangler dev)
-npm run db:migrate:remote   # D1 production
-```
-
-Le nom de base et l’`database_id` dans `wrangler.jsonc` doivent correspondre à **votre** instance D1 Cloudflare (adapter si vous clonez le projet).
-
----
-
-## Développement local
-
-**Worker + D1 local**
+### Worker + D1 locale
 
 ```bash
 cd apps/worker
@@ -159,69 +308,45 @@ npm run db:migrate:local
 npx wrangler dev
 ```
 
-**Next.js**
+Noter l’URL HTTPS locale affichée par Wrangler.
+
+### Next.js
 
 ```bash
 cd apps/web
-# Définir NEXT_PUBLIC_API_URL vers l’URL affichée par wrangler dev
+# Windows PowerShell exemple :
+$env:NEXT_PUBLIC_API_URL="http://127.0.0.1:8787"
 npm run dev
 ```
 
-**Les deux** (depuis la racine, si vous utilisez Turbo) :
+### Turbo (racine)
 
 ```bash
 npx turbo dev
 ```
 
-Tester le cron en local (Wrangler) :
+### Tester le cron en local
 
 ```bash
-cd apps/worker && npx wrangler dev --test-scheduled
+cd apps/worker
+npx wrangler dev --test-scheduled
+```
+
+### Qualité
+
+```bash
+cd apps/web && npm run lint
+cd apps/worker && npx wrangler deploy --dry-run   # optionnel
 ```
 
 ---
 
-## API du Worker
+## 13. Déploiement production
 
-Base URL = déploiement Worker. CORS : `Access-Control-Allow-Origin: *` (méthodes GET, POST, PUT, DELETE, OPTIONS).
+### Worker
 
-| Méthode | Chemin | Auth | Description |
-|---------|--------|------|-------------|
-| `GET` | `/` ou `/health` | Non | `{ ok, version }` |
-| `POST` | `/api/auth` | Non | Body `{ "token": "<JWT Shotgun>" }` — valide le token contre Shotgun, **upsert** `organizers` |
-| `GET` | `/api/config` | `Authorization: Bearer <JWT>` | Lit token Telegram, chat_id, template, settings |
-| `PUT` | `/api/config` | Bearer | Met à jour `telegramToken`, `telegramChatId`, et optionnellement template (champs partiels) |
-| `GET` | `/api/template` | Bearer | Lit le template TipTap + settings |
-| `PUT` | `/api/template` | Bearer | Met à jour `messageTemplate` / `messageTemplateSettings` |
-| `DELETE` | `/api/account` | Bearer | Supprime l’organisateur et ses lignes associées (cascade logique) |
-
-Toute route protégée exige que le JWT Bearer soit **identique** à `organizers.shotgun_token` en base.
-
----
-
-## Comportement du cron (sync Shotgun → Telegram)
-
-1. **Sélection** : tous les `organizers` avec `is_active = 1`.
-2. **Si `bootstrapped = 0`** : `bootstrapOrganizer` — parcourt les événements Shotgun, agrège jusqu’à `BOOTSTRAP_MAX_PAGES` pages par événement, remplit `tickets`, `event_counts`, `deal_counts`, met à jour le curseur — **aucune notification Telegram**.
-3. **Sinon** : `syncOrganizer` — lit jusqu’à `SYNC_MAX_PAGES_PER_RUN` pages par événement depuis le curseur, met à jour les compteurs, détecte les **nouveaux** billets au statut compté (`valid`, `resold`).
-4. **Notifications** : une notification **par événement** ayant eu des nouvelles ventes sur ce run ; texte via `renderMessageTemplateWithData` + fallback si le rendu est vide.
-5. **Telegram** : `sendMessage` avec `disable_web_page_preview: true`. Si `telegram_token` ou `telegram_chat_id` est vide, aucun envoi (sync silencieux).
-
----
-
-## Application web (Next.js)
-
-- **/** — Saisie du token Shotgun → `POST` vers le Worker `/api/auth` via `apiLogin`, stockage local du JWT (`localStorage`), redirection `/dashboard`.
-- **/dashboard** — Charge la config via `GET /api/config` ; en cas d’échec réseau, repli sur `localStorage` (cache). Configuration Telegram : découverte / validation via routes **Next** `POST /api/telegram/discover` et `POST /api/telegram/validate-chat` ; enregistrement métier via `PUT /api/config` sur le Worker. **Une seule** paire token + `chat_id` active par organisateur.
-- **Éditeur de message** — TipTap + variables Shotgun ; sauvegarde locale immédiate + **debounce** ~1,5 s vers `PUT /api/template` sur le Worker (indicateur de sync dans l’UI).
-
-Préviews multi-canaux (WhatsApp, Messenger, Discord) dans le code sont **principalement désactivées** ou réservées à de l’UI future ; le chemin prod documenté ici est **Telegram**.
-
----
-
-## Déploiement
-
-**Worker**
+1. Vérifier `wrangler.jsonc` (**nom Worker**, **binding D1**, `database_id` réel).
+2. Appliquer les migrations **remote** si le schéma a changé :
 
 ```bash
 cd apps/worker
@@ -229,38 +354,62 @@ npm run db:migrate:remote
 npx wrangler deploy
 ```
 
-Vérifier que `wrangler.jsonc` pointe vers la bonne base D1 et que le cron est bien enregistré (`* * * * *` = chaque minute).
-
-**Site Next.js**
+### Site Next.js
 
 ```bash
 cd apps/web
 npm run build
 ```
 
-Hébergement au choix (**Vercel**, **Cloudflare Pages**, etc.) ; définir `NEXT_PUBLIC_API_URL` vers l’URL **HTTPS** du Worker déployé.
+Déployer sur **Vercel**, **Cloudflare Pages**, etc. Définir **`NEXT_PUBLIC_API_URL`** vers l’URL **HTTPS** du Worker.
+
+### Checklist post-déploiement
+
+- [ ] `GET /health` retourne `version: shotgun-notifier-v3`
+- [ ] Login dashboard OK (CORS + URL API)
+- [ ] Cron visible dans le dashboard Cloudflare (Triggers)
+- [ ] D1 : ligne `organizers` mise à jour après sauvegarde dashboard
 
 ---
 
-## Sécurité et données sensibles
+## 14. Observabilité
 
-- Le **JWT Shotgun** est stocké côté client (`localStorage`) et renvoyé en **Bearer** au Worker : traiter le dashboard comme un poste de confiance ; prévoir HTTPS partout.
-- Le Worker stocke en D1 le **token brut du bot Telegram** et le **chat_id** : accès D1 et logs Cloudflare doivent être restreints selon votre modèle de menace.
-- L’API Worker est ouverte en CORS `*` : conçue pour un front public ; la surface sensible est protégée par le Bearer Shotgun + alignement avec la ligne `organizers`.
+`wrangler.jsonc` active **observabilité** (logs, sampling). Utiliser le dashboard Cloudflare Workers pour :
+
+- erreurs `fetch` Shotgun / Telegram ;
+- durées d’exécution du cron ;
+- logs `[shotgun-notifier-v3]`.
 
 ---
 
-## Dépannage
+## 15. Sécurité & menaces
+
+| Sujet | Recommandation |
+|-------|----------------|
+| **JWT en localStorage + cookie** | XSS sur le domaine du front = vol de session API ; CSP, pas de HTML injecté, HTTPS strict. |
+| **Tokens Telegram en D1** | Accès D1 = accès aux bots ; restreindre comptes CF, audit logs. |
+| **CORS `*`** | Surface publique assumée ; toute action sensible exige Bearer valide. |
+| **Pas de rate limit dans ce repo** | À ajouter en périphérie (Cloudflare WAF / rate limiting) si exposition large. |
+
+---
+
+## 16. Dépannage
 
 | Symptôme | Piste |
 |----------|--------|
-| Dashboard « Impossible de valider » au login | `NEXT_PUBLIC_API_URL` incorrect, Worker injoignable, ou JWT Shotgun refusé par l’API événements Shotgun |
-| Aucune notif Telegram | `telegram_token` / `telegram_chat_id` vides en D1, bot pas dans le chat, ou webhook Telegram déjà posé (découverte de chats via `getUpdates` échoue — erreur documentée côté discover) |
-| Template vide ou cassé | Fallback automatique vers un message minimal dans le Worker ; vérifier le JSON TipTap via `GET /api/template` |
-| Cron silencieux | Observabilité Workers / logs ; vérifier `is_active`, erreurs bootstrap (limite de pages), quotas Shotgun |
+| Hydratation React / texte EN puis FR | Comportement attendu après fix i18n (premier paint EN, puis locale) ; ou extension navigateur modifiant le DOM |
+| Login « token invalide » | `NEXT_PUBLIC_API_URL` incorrect, Worker down, JWT refusé par Shotgun (`401/403` sur liste événements) |
+| Aucune notif Telegram | Champs vides en D1, bot retiré du chat, ou **webhook Telegram** déjà défini → `getUpdates` vide (erreur 409 côté discover) |
+| Liste chats vide | Envoyer un message au bot / dans le groupe puis relancer **Détecter mes chats** |
+| Template cassé | Worker retombe sur défaut + fallback texte ; inspecter `GET /api/template` |
+| Bootstrap long | Normal si beaucoup d’historique ; plafond `BOOTSTRAP_MAX_PAGES` |
 
 ---
 
-## Licence
+## 17. Licence
 
 MIT
+
+---
+
+*ShotNotif est un outil d’intégration : le nom **Shotgun** / **Shotgun.live** désigne la plateforme tierce ; ce dépôt n’est pas affilié officiellement à Shotgun.*
