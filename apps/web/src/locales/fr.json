@@ -19,13 +19,13 @@
     "submit": "Se connecter"
   },
   "preview": {
-    "carousel0": "Nouvelle vente Shotgun\n1 billet vendu : 57\nVAGUE 2 : 4/200\n16,50 EUR",
-    "carousel1": "Nouvelle vente Shotgun\n3 billets vendus : 60\nEARLY BIRD : 48/100\nVAGUE 1 : 12/300\n49,50 EUR",
-    "carousel2": "Nouvelle vente Shotgun\n2 billets vendus : 100\nEARLY BIRD : 100/100 SOLD OUT\nPaiement : card",
+    "carousel0": "Nouvelle vente ShotNotif\n1 billet vendu : 57\nVAGUE 2 : 4/200\n16,50 EUR",
+    "carousel1": "Nouvelle vente ShotNotif\n3 billets vendus : 60\nEARLY BIRD : 48/100\nVAGUE 1 : 12/300\n49,50 EUR",
+    "carousel2": "Nouvelle vente ShotNotif\n2 billets vendus : 100\nEARLY BIRD : 100/100 SOLD OUT\nPaiement : card",
     "carousel3": "KODZ X GUETTAPEN X MERCI LILLE\n1 mai 2026 - 21:00\n1 billet vendu : 57\nVAGUE 2 : 4/200"
   },
   "dashboard": {
-    "title": "Shotgun Notifier",
+    "title": "ShotNotif",
     "logout": "Déconnexion",
     "skeletonAria": "Chargement du tableau de bord",
     "sectionTelegramTitle": "Configuration Telegram",
@@ -80,7 +80,7 @@
   "setup": {
     "telegram": {
       "step0": "Ouvrez Telegram et lancez une conversation avec",
-      "step1": "Envoyez la commande <cmd>/newbot</cmd> et suivez les instructions : choisissez un <b>nom</b> (ex. Shotgun Notifier) puis un <b>username</b> (ex. shotgun_notifier_bot).",
+      "step1": "Envoyez la commande <cmd>/newbot</cmd> et suivez les instructions : choisissez un <b>nom</b> (ex. ShotNotif) puis un <b>username</b> (ex. shotnotif_bot).",
       "step2": "BotFather vous envoie un message avec votre <b>Bot Token</b> (ressemble à <b>7103948261:AAF…</b>). Copiez-le et collez-le dans le champ ci-dessous.",
       "step3": "Pour obtenir votre <b>Chat ID</b>, faites d'abord parler le bot dans le bon endroit.",
       "colPrivateTitle": "Privé",
@@ -110,9 +110,9 @@
   },
   "whatsappPreview": {
     "encryptionNotice": "Les messages et appels sont chiffrés de bout en bout.",
-    "senderShort": "Shotgun",
+    "senderShort": "ShotNotif",
     "businessSubtitle": "compte business",
-    "groupParticipants": "Lucas, Marie, Shotgun Notifier"
+    "groupParticipants": "Lucas, Marie, ShotNotif"
   },
   "discordPreview": {
     "composeHint": "Envoyer un message dans #{{channel}}",
@@ -127,15 +127,15 @@
     "groupInitials": "OE",
     "groupTitle": "Orga Events",
     "groupMembers": "{{count}} membres",
-    "botInitials": "SG",
-    "botTitle": "Shotgun Notifier",
+    "botInitials": "SN",
+    "botTitle": "ShotNotif",
     "botSubtitle": "bot",
     "today": "Aujourd'hui",
     "userLucas": "Lucas",
     "userMarie": "Marie",
     "msgLucas": "On en est où des ventes ?",
     "msgMarie": "Le bot va nous dire ça",
-    "senderBot": "Shotgun Notifier",
+    "senderBot": "ShotNotif",
     "emptyMessage": "Votre message apparaîtra ici.",
     "composerPlaceholder": "Message"
   },

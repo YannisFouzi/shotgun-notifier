@@ -1,4 +1,4 @@
-# Shotgun Notifier
+# ShotNotif
 
 Notifications pour chaque nouvelle vente de billet sur [Shotgun.live](https://shotgun.live), avec **polling planifié** sur Cloudflare Workers, persistance **Cloudflare D1**, et **dashboard Next.js** pour lier Telegram et éditer le message (même logique de rendu que le Worker grâce au package partagé).
 

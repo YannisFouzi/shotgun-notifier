@@ -349,7 +349,7 @@ function v(key: string): TemplateNode {
 export const DEFAULT_MESSAGE_TEMPLATE_CONTENT: TemplateNode = {
   type: "doc",
   content: [
-    p([txt("Nouvelle vente Shotgun")]),
+    p([txt("Nouvelle vente ShotNotif")]),
     p([v("new_tickets_label"), txt(" : "), v("event_total_sold")]),
     p([v("deal_lines")]),
   ],
@@ -382,7 +382,7 @@ export const MESSAGE_TEMPLATE_PRESETS: MessageTemplatePreset[] = [
     content: {
       type: "doc",
       content: [
-        p([txt("Nouvelle vente Shotgun")]),
+        p([txt("Nouvelle vente ShotNotif")]),
         p([v("new_tickets_label"), txt(" - "), v("new_tickets_revenue")]),
         p([v("first_deal_name"), txt(" : "), v("deal_lines")]),
         p([txt("Paiement : "), v("payment_methods")]),

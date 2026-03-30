@@ -1,5 +1,5 @@
 /**
- * API client for the Shotgun Notifier Worker.
+ * API client for the ShotNotif Worker.
  *
  * All calls go through the Worker's REST API.
  * Auth is via the Shotgun token passed as Bearer header.

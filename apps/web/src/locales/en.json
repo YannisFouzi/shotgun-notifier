@@ -19,13 +19,13 @@
     "submit": "Sign in"
   },
   "preview": {
-    "carousel0": "New Shotgun sale\n1 ticket sold : 57\nWAVE 2 : 4/200\n16.50 EUR",
-    "carousel1": "New Shotgun sale\n3 tickets sold : 60\nEARLY BIRD : 48/100\nWAVE 1 : 12/300\n49.50 EUR",
-    "carousel2": "New Shotgun sale\n2 tickets sold : 100\nEARLY BIRD : 100/100 SOLD OUT\nPayment : card",
+    "carousel0": "New ShotNotif sale\n1 ticket sold : 57\nWAVE 2 : 4/200\n16.50 EUR",
+    "carousel1": "New ShotNotif sale\n3 tickets sold : 60\nEARLY BIRD : 48/100\nWAVE 1 : 12/300\n49.50 EUR",
+    "carousel2": "New ShotNotif sale\n2 tickets sold : 100\nEARLY BIRD : 100/100 SOLD OUT\nPayment : card",
     "carousel3": "KODZ X GUETTAPEN X MERCI LILLE\nMay 1, 2026 - 21:00\n1 ticket sold : 57\nWAVE 2 : 4/200"
   },
   "dashboard": {
-    "title": "Shotgun Notifier",
+    "title": "ShotNotif",
     "logout": "Log out",
     "skeletonAria": "Loading dashboard",
     "sectionTelegramTitle": "Telegram setup",
@@ -80,7 +80,7 @@
   "setup": {
     "telegram": {
       "step0": "Open Telegram and start a chat with",
-      "step1": "Send the <cmd>/newbot</cmd> command and follow the prompts: pick a <b>name</b> (e.g. Shotgun Notifier) then a <b>username</b> (e.g. shotgun_notifier_bot).",
+      "step1": "Send the <cmd>/newbot</cmd> command and follow the prompts: pick a <b>name</b> (e.g. ShotNotif) then a <b>username</b> (e.g. shotnotif_bot).",
       "step2": "BotFather sends a message with your <b>Bot Token</b> (looks like <b>7103948261:AAF…</b>). Copy it and paste it in the field below.",
       "step3": "To get your <b>Chat ID</b>, first have the bot receive a message in the right place.",
       "colPrivateTitle": "Private",
@@ -110,10 +110,10 @@
     "inputPlaceholder": "Message",
     "m0": "/newbot",
     "m1": "Alright. A new bot. How are we going to call it? Please choose a name for your bot.",
-    "m2": "Shotgun Notifier",
+    "m2": "ShotNotif",
     "m3a": "Good. Now let's choose a username for your bot. It must end in ",
     "m3b": ". Like this, for example: TetrisBot or tetris_bot.",
-    "m4": "shotgun_notifier_bot",
+    "m4": "shotnotif_bot",
     "m5a": "Done! Congratulations on your new bot.\n\nUse this token to access the HTTP API:\n",
     "m5b": "\nKeep your token ",
     "m5c": "secure",
@@ -128,9 +128,9 @@
   },
   "whatsappPreview": {
     "encryptionNotice": "Messages and calls are end-to-end encrypted.",
-    "senderShort": "Shotgun",
+    "senderShort": "ShotNotif",
     "businessSubtitle": "Business account",
-    "groupParticipants": "Lucas, Marie, Shotgun Notifier"
+    "groupParticipants": "Lucas, Marie, ShotNotif"
   },
   "discordPreview": {
     "composeHint": "Send a message in #{{channel}}",
@@ -145,15 +145,15 @@
     "groupInitials": "OE",
     "groupTitle": "Orga Events",
     "groupMembers": "{{count}} members",
-    "botInitials": "SG",
-    "botTitle": "Shotgun Notifier",
+    "botInitials": "SN",
+    "botTitle": "ShotNotif",
     "botSubtitle": "bot",
     "today": "Today",
     "userLucas": "Lucas",
     "userMarie": "Marie",
     "msgLucas": "How are sales going?",
     "msgMarie": "The bot will tell us",
-    "senderBot": "Shotgun Notifier",
+    "senderBot": "ShotNotif",
     "emptyMessage": "Your message will appear here.",
     "composerPlaceholder": "Message"
   },

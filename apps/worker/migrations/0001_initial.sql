@@ -1,4 +1,4 @@
--- Shotgun Notifier — initial D1 schema
+-- ShotNotif — initial D1 schema
 
 CREATE TABLE organizers (
   id             TEXT    PRIMARY KEY,                           -- organizer_id from Shotgun JWT

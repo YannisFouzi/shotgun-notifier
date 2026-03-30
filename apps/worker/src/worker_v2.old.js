@@ -144,7 +144,7 @@ function getEventName(ticket) {
 }
 
 function formatTelegramMessage({ showEventName, eventName, newCount, totalSold, dealLines }) {
-  const lines = ["Nouvelle vente Shotgun"];
+  const lines = ["Nouvelle vente ShotNotif"];
 
   if (showEventName) {
     lines.push(eventName);
