@@ -85,8 +85,7 @@ telegramShotgun/
 │   │   │   ├── 0001_initial.sql    # schéma principal
 │   │   │   └── 0002_telegram_chat_display.sql
 │   │   └── src/
-│   │       ├── index.js            # fetch + scheduled + logique sync
-│   │       └── worker_v2.old.js    # historique (KV) — non utilisé en prod
+│   │       └── index.js            # fetch + scheduled + logique sync
 │   └── web/
 │       ├── src/
 │       │   ├── app/                # App Router Next.js 16
@@ -282,7 +281,7 @@ Réponses structurées avec `error` + `errorKey` pour l’i18n côté client (`t
 
 ### `apps/worker`
 
-La logique **v3** lit tokens Telegram, chat_id et templates depuis **D1**, pas depuis des secrets Wrangler pour le cron. Les secrets globaux type `TELEGRAM_*` / `SG_TOKEN` relèvent d’**anciens** déploiements (cf. `worker_v2.old.js`).
+La logique **v3** lit tokens Telegram, chat_id et templates depuis **D1**, pas depuis des secrets Wrangler pour le cron. Les variables type `TELEGRAM_*` / `SG_TOKEN` dans `.dev.vars` / `.env.example` servent surtout au **dev local** ou à d’anciens flux ; le cron prod s’appuie sur la base.
 
 ---
 
