@@ -4,6 +4,13 @@
     "fr": "Français",
     "toggleAria": "Langue"
   },
+  "legal": {
+    "navAria": "Informations légales",
+    "linkCgu": "CGU",
+    "linkCgv": "CGV",
+    "backHome": "Accueil",
+    "contactLabel": "Contact"
+  },
   "home": {
     "title": "Recevez un message sur Telegram à chaque vente Shotgun",
     "subtitle": "Configurez vos notifications en quelques secondes.",

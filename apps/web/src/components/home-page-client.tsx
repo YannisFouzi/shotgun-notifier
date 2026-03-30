@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LanguageToggle } from "@/components/language-toggle";
 import { TelegramPreview } from "@/components/telegram-preview";
+import { SiteFooter } from "@/components/site-footer";
 import {
   normalizeShotgunToken,
   saveStoredShotgunToken,
@@ -71,6 +72,7 @@ export function HomePageClient() {
   }
 
   return (
+    <>
     <main className="relative min-h-screen overflow-x-hidden bg-[#050608] text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(42,171,238,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(37,211,102,0.12),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_28%)]" />
 
@@ -161,5 +163,7 @@ export function HomePageClient() {
         </div>
       </div>
     </main>
+    <SiteFooter variant="home" />
+    </>
   );
 }
