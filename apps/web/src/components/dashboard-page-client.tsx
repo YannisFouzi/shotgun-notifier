@@ -639,7 +639,7 @@ export function DashboardPageClient() {
             <div>
               <h2 className="text-2xl font-bold">Message de notification</h2>
               <p className="text-sm text-muted-foreground">
-                Ecrivez votre message puis ajoutez les informations a afficher.
+                Ecrivez votre message en ajoutant les informations a afficher.
               </p>
             </div>
 
