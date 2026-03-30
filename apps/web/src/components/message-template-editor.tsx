@@ -115,7 +115,8 @@ export function MessageTemplateEditor({
         (varKey, fb) =>
           t(`variables.${varKey}.label`, { defaultValue: fb })
       ),
-    [value, settings, sampleContext, t]
+    // settings : conservé pour l’API ; le mockup n’en dépend pas (ex. nom d’event toujours visible)
+    [value, sampleContext, t]
   );
 
   const presetOptions = useMemo(

@@ -462,14 +462,16 @@ function applyMessageTemplateSettings(
 
 /**
  * Render a template with sample data for preview (frontend).
+ * N’applique pas showEventNameOnlyWhenMultipleEvents : le mockup garde toujours
+ * l’exemple (ou [libellé]) pour montrer les variables — la règle ne s’applique qu’en prod (Worker).
  */
 export function renderMessageTemplatePreview(
   content: TemplateNode,
   context: Record<string, string> = SAMPLE_MESSAGE_TEMPLATE_CONTEXT,
-  settings: MessageTemplateSettings = DEFAULT_MESSAGE_TEMPLATE_SETTINGS,
+  _settings: MessageTemplateSettings = DEFAULT_MESSAGE_TEMPLATE_SETTINGS,
   resolveLabel?: (key: string, fallbackLabel: string) => string
 ) {
-  const resolved = applyMessageTemplateSettings(context, settings);
+  const resolved = context;
   return renderMessageTemplate(
     content,
     (key, label) => {
