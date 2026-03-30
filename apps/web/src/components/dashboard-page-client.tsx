@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JSONContent } from "@tiptap/react";
 import { useRouter } from "next/navigation";
-import { Bot, Loader2, User, Users } from "lucide-react";
+import { Bot, Loader2, Pencil, User, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -71,6 +71,9 @@ export function DashboardPageClient() {
   const [telegramConfigured, setTelegramConfigured] = useState(false);
   const [telegramConfigExpanded, setTelegramConfigExpanded] = useState(true);
   const [channelSaved, setChannelSaved] = useState(false);
+  const [editingBotToken, setEditingBotToken] = useState(false);
+  const [editingChatId, setEditingChatId] = useState(false);
+  const [savedBotUsername, setSavedBotUsername] = useState("");
   const [messageTemplate, setMessageTemplate] = useState<JSONContent>(
     cloneMessageTemplateContent(DEFAULT_MESSAGE_TEMPLATE_CONTENT)
   );
@@ -95,6 +98,24 @@ export function DashboardPageClient() {
         setTelegramChatValidated(hasConfig);
         setTelegramConfigured(hasConfig);
         setTelegramConfigExpanded(!hasConfig);
+
+        // Fetch bot info if we have a saved token
+        if (tgToken.trim()) {
+          fetch("/api/telegram/discover", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: tgToken.trim() }),
+          })
+            .then((res) => res.json())
+            .then((data: unknown) => {
+              const result = data as TelegramDetectionResult | { error?: string };
+              if ("bot" in result && result.bot) {
+                setSavedBotUsername(result.bot.username || result.bot.firstName);
+                setTelegramLookupResult(result);
+              }
+            })
+            .catch(() => {});
+        }
 
         const template = config.messageTemplate as JSONContent;
         if (template && typeof template === "object" && template.type === "doc") {
@@ -234,6 +255,8 @@ export function DashboardPageClient() {
 
       setTelegramLookupResult(payload);
       setTelegramTokenValidated(true);
+      setSavedBotUsername(payload.bot.username || payload.bot.firstName);
+      setEditingBotToken(false);
     } catch {
       setTelegramLookupResult(null);
       setTelegramLookupError("Impossible de contacter Telegram.");
@@ -306,6 +329,7 @@ export function DashboardPageClient() {
       setTelegramChatValidated(true);
       setTelegramConfigured(true);
       setTelegramConfigExpanded(false);
+      setEditingChatId(false);
       setChannelSaved(true);
       setTimeout(() => setChannelSaved(false), 2000);
     } catch {
@@ -324,7 +348,24 @@ export function DashboardPageClient() {
   const isTelegramSetupOpen = !telegramConfigured || telegramConfigExpanded;
   const showTelegramSummaryBar = telegramConfigured && !telegramConfigExpanded;
   const showMessageTemplate = telegramConfigured;
-  const telegramTokenStepContent = (
+  const botTokenIsLocked = telegramTokenValidated && !editingBotToken && savedBotUsername;
+
+  const telegramTokenStepContent = botTokenIsLocked ? (
+    <div className="flex items-center gap-2">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-medium text-emerald-300">
+        <Bot className="size-3.5" />
+        {savedBotUsername.startsWith("@") ? savedBotUsername : `@${savedBotUsername}`}
+      </span>
+      <button
+        type="button"
+        onClick={() => setEditingBotToken(true)}
+        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Pencil className="size-3" />
+        Modifier
+      </button>
+    </div>
+  ) : (
     <div className="space-y-3">
       <div className="space-y-1.5">
         <Label htmlFor="tg-token">Bot Token</Label>
@@ -354,13 +395,53 @@ export function DashboardPageClient() {
             {telegramLookupResult.bot.username || telegramLookupResult.bot.firstName}
           </span>
         )}
+        {editingBotToken && savedBotUsername && (
+          <button
+            type="button"
+            onClick={() => setEditingBotToken(false)}
+            className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Annuler
+          </button>
+        )}
       </div>
       {telegramLookupError && (
         <p className="text-xs text-amber-400">{telegramLookupError}</p>
       )}
     </div>
   );
-  const telegramChatStepContent = (
+  const chatIdIsLocked = telegramChatValidated && !editingChatId && telegramChatId.trim();
+  const chatDisplayName = telegramValidatedChat?.title || telegramChatId;
+  const chatIsGroup = telegramValidatedChat
+    ? telegramValidatedChat.type !== "private"
+    : telegramChatId.startsWith("-");
+
+  const telegramChatStepContent = chatIdIsLocked ? (
+    <div className="flex items-center gap-2">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-medium text-emerald-300">
+        {chatIsGroup ? (
+          <Users className="size-3.5" />
+        ) : (
+          <User className="size-3.5" />
+        )}
+        {chatDisplayName}
+      </span>
+      <button
+        type="button"
+        onClick={() => {
+          setEditingChatId(true);
+          // Re-fetch chats if we have the bot token
+          if (telegramTokenValidated && !telegramLookupResult) {
+            handleTelegramDetectChats();
+          }
+        }}
+        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Pencil className="size-3" />
+        Modifier
+      </button>
+    </div>
+  ) : (
     <div className="space-y-3">
       {telegramLookupResult?.bot && !telegramLookupResult.bot.canJoinGroups && (
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
@@ -462,6 +543,15 @@ export function DashboardPageClient() {
           )}
           Enregistrer
         </Button>
+        {editingChatId && (
+          <button
+            type="button"
+            onClick={() => setEditingChatId(false)}
+            className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Annuler
+          </button>
+        )}
       </div>
     </div>
   );
