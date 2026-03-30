@@ -19,14 +19,20 @@ export async function POST(request: Request) {
 
     if (!token) {
       return NextResponse.json(
-        { error: "Ajoutez un Bot Token Telegram." },
+        {
+          error: "Ajoutez un Bot Token Telegram.",
+          errorKey: "missingBotToken",
+        },
         { status: 400 }
       );
     }
 
     if (!chatId) {
       return NextResponse.json(
-        { error: "Ajoutez un Chat ID Telegram." },
+        {
+          error: "Ajoutez un Chat ID Telegram.",
+          errorKey: "missingChatId",
+        },
         { status: 400 }
       );
     }
@@ -39,6 +45,7 @@ export async function POST(request: Request) {
         {
           error:
             "Impossible de valider ce chat. Verifiez que le bot est bien present et qu'un message a deja ete envoye.",
+          errorKey: "validateChatFailed",
         },
         { status: 404 }
       );
@@ -57,6 +64,9 @@ export async function POST(request: Request) {
     const message =
       error instanceof Error ? error.message : "Impossible de valider ce chat Telegram.";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message, errorKey: "validateGeneric" },
+      { status: 500 }
+    );
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import {
   AtSign,
   Bell,
@@ -18,8 +19,12 @@ interface DiscordPreviewProps {
   mode?: "bot" | "group";
 }
 
-function getPreviewTime() {
-  return new Intl.DateTimeFormat("fr-FR", {
+function timeLocaleTag(lng: string) {
+  return lng.startsWith("fr") ? "fr-FR" : "en-GB";
+}
+
+function getPreviewTime(localeTag: string) {
+  return new Intl.DateTimeFormat(localeTag, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -28,10 +33,10 @@ function getPreviewTime() {
   }).format(new Date());
 }
 
-function getPreviousTime() {
+function getPreviousTime(localeTag: string) {
   const d = new Date();
   d.setMinutes(d.getMinutes() - 5);
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(localeTag, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -41,15 +46,16 @@ function getPreviousTime() {
 }
 
 export function DiscordPreview({ message, mode = "bot" }: DiscordPreviewProps) {
-  const renderedMessage = message || "Votre message apparaitra ici.";
-  const previewTime = getPreviewTime();
-  const prevTime = getPreviousTime();
+  const { t, i18n } = useTranslation();
+  const localeTag = timeLocaleTag(i18n.resolvedLanguage || i18n.language || "en");
+  const renderedMessage = message || t("telegramPreview.emptyMessage");
+  const previewTime = getPreviewTime(localeTag);
+  const prevTime = getPreviousTime(localeTag);
   const isGroup = mode === "group";
   const channelName = isGroup ? "orga-events" : "notifications";
 
   return (
     <div className="mx-auto flex h-[42rem] w-full max-w-[23rem] flex-col overflow-hidden rounded-[2.2rem] border border-[#1e1f22] bg-[#313338] shadow-[0_28px_60px_rgba(0,0,0,0.38)]">
-      {/* Channel header */}
       <div className="flex items-center gap-2 border-b border-[#1e1f22] bg-[#313338] px-3 py-2.5">
         <Hash className="size-4 text-[#80848e]" strokeWidth={2.5} />
         <span className="text-sm font-semibold text-[#f2f3f5]">
@@ -67,65 +73,64 @@ export function DiscordPreview({ message, mode = "bot" }: DiscordPreviewProps) {
         </div>
       </div>
 
-      {/* Messages area */}
       <div className="flex-1 bg-[#313338] px-4 py-4">
-        {/* Date separator */}
         <div className="mb-4 flex items-center gap-2">
           <div className="h-px flex-1 bg-[#3f4147]" />
           <span className="text-[11px] font-semibold text-[#80848e]">
-            Aujourd&apos;hui
+            {t("telegramPreview.today")}
           </span>
           <div className="h-px flex-1 bg-[#3f4147]" />
         </div>
 
         {isGroup && (
           <>
-            {/* Message from Lucas */}
             <div className="mb-4 flex gap-3 px-1 py-1">
               <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#ed4245] text-sm font-bold text-white">
                 L
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[#ed4245]">Lucas</span>
+                  <span className="text-sm font-semibold text-[#ed4245]">
+                    {t("telegramPreview.userLucas")}
+                  </span>
                   <span className="text-[11px] text-[#80848e]">{prevTime}</span>
                 </div>
                 <div className="mt-0.5 text-[13.5px] leading-[1.4] text-[#dbdee1]">
-                  On en est ou des ventes ?
+                  {t("telegramPreview.msgLucas")}
                 </div>
               </div>
             </div>
 
-            {/* Message from Marie */}
             <div className="mb-4 flex gap-3 px-1 py-1">
               <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#fee75c] text-sm font-bold text-[#1e1f22]">
                 M
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[#fee75c]">Marie</span>
+                  <span className="text-sm font-semibold text-[#fee75c]">
+                    {t("telegramPreview.userMarie")}
+                  </span>
                   <span className="text-[11px] text-[#80848e]">{prevTime}</span>
                 </div>
                 <div className="mt-0.5 text-[13.5px] leading-[1.4] text-[#dbdee1]">
-                  Le bot va nous dire ca
+                  {t("telegramPreview.msgMarie")}
                 </div>
               </div>
             </div>
           </>
         )}
 
-        {/* Bot message */}
         <div className="flex gap-3 rounded-lg px-1 py-1">
           <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#5865F2] text-sm font-bold text-white">
-            SG
+            {t("telegramPreview.botInitials")}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#f2f3f5]">
-                Shotgun Notifier
+                {t("telegramPreview.senderBot")}
               </span>
               <span className="rounded-[3px] bg-[#5865F2] px-[5px] py-[1px] text-[10px] font-medium text-white">
-                BOT
+                {t("discordPreview.botTag")}
               </span>
               <span className="text-[11px] text-[#80848e]">{previewTime}</span>
             </div>
@@ -136,12 +141,11 @@ export function DiscordPreview({ message, mode = "bot" }: DiscordPreviewProps) {
         </div>
       </div>
 
-      {/* Input area */}
       <div className="bg-[#313338] px-4 pb-4">
         <div className="flex items-center gap-2 rounded-lg bg-[#383a40] px-3 py-2.5">
           <Plus className="size-5 text-[#b5bac1]" strokeWidth={2.5} />
           <span className="flex-1 text-sm text-[#6d6f78]">
-            Envoyer un message dans #{channelName}
+            {t("discordPreview.composeHint", { channel: channelName })}
           </span>
           <div className="flex items-center gap-3 text-[#b5bac1]">
             <Smile className="size-5" strokeWidth={2} />

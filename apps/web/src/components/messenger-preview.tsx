@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import {
   ChevronLeft,
   Mic,
@@ -16,26 +17,32 @@ interface MessengerPreviewProps {
   mode?: "bot" | "group";
 }
 
-function getPreviewTime() {
-  return new Intl.DateTimeFormat("fr-FR", {
+function timeLocaleTag(lng: string) {
+  return lng.startsWith("fr") ? "fr-FR" : "en-GB";
+}
+
+function getPreviewTime(localeTag: string) {
+  return new Intl.DateTimeFormat(localeTag, {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date());
 }
 
-function getPreviousTime() {
+function getPreviousTime(localeTag: string) {
   const d = new Date();
   d.setMinutes(d.getMinutes() - 6);
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(localeTag, {
     hour: "2-digit",
     minute: "2-digit",
   }).format(d);
 }
 
 export function MessengerPreview({ message, mode = "bot" }: MessengerPreviewProps) {
-  const renderedMessage = message || "Votre message apparaitra ici.";
-  const previewTime = getPreviewTime();
-  const prevTime = getPreviousTime();
+  const { t, i18n } = useTranslation();
+  const localeTag = timeLocaleTag(i18n.resolvedLanguage || i18n.language || "en");
+  const renderedMessage = message || t("telegramPreview.emptyMessage");
+  const previewTime = getPreviewTime(localeTag);
+  const prevTime = getPreviousTime(localeTag);
   const isGroup = mode === "group";
 
   return (
@@ -61,18 +68,22 @@ export function MessengerPreview({ message, mode = "bot" }: MessengerPreviewProp
 
       {/* Header */}
       <div className="flex items-center gap-2.5 border-b border-[#3a3b3c] bg-[#242526] px-2 py-2.5">
-        <button type="button" className="grid size-8 place-items-center text-[#0084ff]" aria-label="Retour">
+        <button
+          type="button"
+          className="grid size-8 place-items-center text-[#0084ff]"
+          aria-label={t("telegramPreview.back")}
+        >
           <ChevronLeft className="size-5" strokeWidth={2.5} />
         </button>
 
         <div className="relative">
           {isGroup ? (
             <div className="grid size-9 shrink-0 place-items-center rounded-full bg-[#3a3b3c] text-xs font-bold text-white">
-              OE
+              {t("telegramPreview.groupInitials")}
             </div>
           ) : (
             <div className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0084ff] to-[#a033ff] text-xs font-bold text-white">
-              SG
+              {t("telegramPreview.botInitials")}
             </div>
           )}
           <div className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#242526] bg-[#31a24c]" />
@@ -80,18 +91,30 @@ export function MessengerPreview({ message, mode = "bot" }: MessengerPreviewProp
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">
-            {isGroup ? "Orga Events" : "Shotgun Notifier"}
+            {isGroup
+              ? t("telegramPreview.groupTitle")
+              : t("telegramPreview.senderBot")}
           </p>
           <p className="truncate text-[11px] text-[#65676b]">
-            {isGroup ? "Lucas, Marie, Shotgun Notifier" : "Actif maintenant"}
+            {isGroup
+              ? t("whatsappPreview.groupParticipants")
+              : t("messengerPreview.activeNow")}
           </p>
         </div>
 
         <div className="flex items-center gap-1 text-[#0084ff]">
-          <button type="button" className="grid size-8 place-items-center rounded-full" aria-label="Appel">
+          <button
+            type="button"
+            className="grid size-8 place-items-center rounded-full"
+            aria-label={t("telegramPreview.call")}
+          >
             <Phone className="size-4.5" strokeWidth={2.2} />
           </button>
-          <button type="button" className="grid size-8 place-items-center rounded-full" aria-label="Video">
+          <button
+            type="button"
+            className="grid size-8 place-items-center rounded-full"
+            aria-label={t("telegramPreview.video")}
+          >
             <Video className="size-4.5" strokeWidth={2.2} />
           </button>
         </div>
@@ -113,7 +136,7 @@ export function MessengerPreview({ message, mode = "bot" }: MessengerPreviewProp
               <div className="max-w-[78%]">
                 <div className="rounded-2xl rounded-bl-md bg-[#303030] px-3.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
                   <div className="text-[13px] leading-[1.45] text-[#e4e6eb]">
-                    On en est ou des ventes ?
+                    {t("telegramPreview.msgLucas")}
                   </div>
                 </div>
               </div>
@@ -124,7 +147,7 @@ export function MessengerPreview({ message, mode = "bot" }: MessengerPreviewProp
               <div className="max-w-[78%]">
                 <div className="rounded-2xl rounded-br-md bg-[#0084ff] px-3.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
                   <div className="text-[13px] leading-[1.45] text-white">
-                    Le bot va nous dire ca
+                    {t("telegramPreview.msgMarie")}
                   </div>
                 </div>
               </div>
@@ -140,7 +163,7 @@ export function MessengerPreview({ message, mode = "bot" }: MessengerPreviewProp
         {/* Bot message */}
         <div className="flex items-end gap-2">
           <div className="grid size-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0084ff] to-[#a033ff] text-[10px] font-bold text-white">
-            SG
+            {t("telegramPreview.botInitials")}
           </div>
           <div className="max-w-[78%]">
             <div className="rounded-2xl rounded-bl-md bg-[#303030] px-3.5 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
@@ -170,7 +193,9 @@ export function MessengerPreview({ message, mode = "bot" }: MessengerPreviewProp
             </div>
           </div>
           <div className="flex min-h-9 flex-1 items-center rounded-full bg-[#3a3b3c] px-3">
-            <span className="text-sm text-[#65676b]">Aa</span>
+            <span className="text-sm text-[#65676b]">
+              {t("messengerPreview.inputPlaceholder")}
+            </span>
             <div className="ml-auto grid size-6 place-items-center text-[#0084ff]">
               <Smile className="size-4" strokeWidth={2} />
             </div>

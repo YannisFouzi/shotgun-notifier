@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { X } from "lucide-react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
@@ -11,12 +12,14 @@ export function ShotgunVariableChip({
   deleteNode,
   node,
 }: NodeViewProps) {
+  const { t } = useTranslation();
   const [isActionsVisible, setIsActionsVisible] = useState(false);
   const key = typeof node.attrs.key === "string" ? node.attrs.key : "";
-  const label =
+  const storedLabel =
     typeof node.attrs.label === "string" && node.attrs.label
       ? node.attrs.label
       : key;
+  const label = t(`variables.${key}.label`, { defaultValue: storedLabel });
 
   function isRemoveButtonTarget(event: MouseEvent<HTMLElement>) {
     return (event.target as HTMLElement).closest("button");
@@ -56,8 +59,8 @@ export function ShotgunVariableChip({
       <button
         type="button"
         contentEditable={false}
-        aria-label={`Supprimer ${label}`}
-        title={`Supprimer ${label}`}
+        aria-label={t("editor.removeChip", { name: label })}
+        title={t("editor.removeChip", { name: label })}
         onMouseDown={(event) => {
           event.preventDefault();
           event.stopPropagation();

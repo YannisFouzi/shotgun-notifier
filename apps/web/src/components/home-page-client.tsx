@@ -1,94 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Trans, useTranslation } from "react-i18next";
 import { ArrowUpRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { LanguageToggle } from "@/components/language-toggle";
 import { TelegramPreview } from "@/components/telegram-preview";
-// Hidden — kept for future multi-platform support
-// import { DiscordPreview } from "@/components/discord-preview";
-// import { MessengerPreview } from "@/components/messenger-preview";
-// import { WhatsAppPreview } from "@/components/whatsapp-preview";
 import {
   normalizeShotgunToken,
   saveStoredShotgunToken,
   SHOTGUN_INTEGRATIONS_URL,
 } from "@/lib/shotgun";
 import { apiLogin, ApiError } from "@/lib/api";
-// Hidden — kept for future multi-platform support
-type PreviewChannel = "whatsapp" | "telegram" | "messenger" | "discord";
-type PreviewMode = "bot" | "group";
-
-interface PreviewScenario {
-  id: string;
-  channel: PreviewChannel;
-  mode: PreviewMode;
-  message: string;
-  hidden?: boolean;
-}
-
-const PREVIEW_MESSAGES: string[] = [
-  "Nouvelle vente Shotgun\n1 billet vendu : 57\nVAGUE 2 : 4/200\n16.50 EUR",
-  "Nouvelle vente Shotgun\n3 billets vendus : 60\nEARLY BIRD : 48/100\nVAGUE 1 : 12/300\n49.50 EUR",
-  "Nouvelle vente Shotgun\n2 billets vendus : 100\nEARLY BIRD : 100/100 SOLD OUT\nPaiement : card",
-  "KODZ X GUETTAPEN X MERCI LILLE\n1 mai 2026 - 21:00\n1 billet vendu : 57\nVAGUE 2 : 4/200",
-];
-
-// Kept for future multi-platform support
-const PREVIEW_SCENARIOS: PreviewScenario[] = [
-  {
-    id: "wa-sale",
-    channel: "whatsapp",
-    mode: "bot",
-    message:
-      "Nouvelle vente Shotgun\n1 billet vendu\nVAGUE 2 : 4/200\n57 billets vendus au total",
-    hidden: true,
-  },
-  {
-    id: "msg-alert",
-    channel: "messenger",
-    mode: "bot",
-    message:
-      "Alerte Shotgun\nVAGUE 1 est sold out\nVAGUE 2 devient le billet principal",
-    hidden: true,
-  },
-  {
-    id: "dc-sale",
-    channel: "discord",
-    mode: "group",
-    message:
-      "Nouvelle vente Shotgun\n2 billets vendus\nEARLY : 18/100\n82 billets restants",
-    hidden: true,
-  },
-];
-
-// Hidden — kept for future multi-platform support
-// function renderPreview(channel: PreviewChannel, message: string, mode: PreviewMode) {
-//   if (channel === "whatsapp") return <WhatsAppPreview message={message} mode={mode} />;
-//   if (channel === "telegram") return <TelegramPreview message={message} mode={mode} />;
-//   if (channel === "messenger") return <MessengerPreview message={message} mode={mode} />;
-//   return <DiscordPreview message={message} mode={mode} />;
-// }
 
 export function HomePageClient() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeMessageIndex, setActiveMessageIndex] = useState(0);
 
-  const activeMessage = PREVIEW_MESSAGES[activeMessageIndex] ?? PREVIEW_MESSAGES[0];
+  const previewMessages = useMemo(
+    () => [
+      t("preview.carousel0"),
+      t("preview.carousel1"),
+      t("preview.carousel2"),
+      t("preview.carousel3"),
+    ],
+    [t]
+  );
+
+  const activeMessage =
+    previewMessages[activeMessageIndex] ?? previewMessages[0];
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      setActiveMessageIndex((current) => (current + 1) % PREVIEW_MESSAGES.length);
+      setActiveMessageIndex(
+        (current) => (current + 1) % previewMessages.length
+      );
     }, 4200);
 
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [previewMessages.length]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,47 +62,58 @@ export function HomePageClient() {
       router.replace("/dashboard");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        setError("Token invalide");
+        setError(t("home.errorInvalidToken"));
       } else {
-        setError("Impossible de valider le token");
+        setError(t("home.errorValidateFailed"));
       }
       setLoading(false);
     }
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050608] text-white">
+    <main className="relative min-h-screen overflow-x-hidden bg-[#050608] text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(42,171,238,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(37,211,102,0.12),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_28%)]" />
 
-      <div className="relative mx-auto max-w-6xl px-6 py-10 lg:px-8 lg:py-14">
-        <div className="grid gap-8 xl:min-h-[calc(100vh-7rem)] xl:grid-cols-[minmax(0,29rem)_minmax(0,1fr)] xl:items-center">
-          <section className="space-y-6 xl:flex xl:flex-col xl:justify-center">
+      <div className="relative mx-auto max-w-6xl px-6 pb-10 pt-4 lg:px-8 xl:py-14">
+        <div className="mb-5 flex justify-end xl:mb-0 xl:hidden">
+          <LanguageToggle className="border-white/15 bg-black/30" />
+        </div>
+
+        <div className="grid min-w-0 gap-8 xl:min-h-[calc(100vh-7rem)] xl:grid-cols-[minmax(0,29rem)_minmax(0,1fr)] xl:items-center">
+          <section className="min-w-0 space-y-6 xl:flex xl:flex-col xl:justify-center">
             <div className="space-y-4">
               <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                Recevez un message sur Telegram a chaque vente Shotgun
+                {t("home.title")}
               </h1>
               <p className="max-w-lg text-base leading-7 text-white/68">
-                Configurez vos notifications en quelques secondes.
+                {t("home.subtitle")}
               </p>
             </div>
 
             <div className="space-y-3 text-sm font-medium text-white/72">
               <p>
-                1. Connectez vous a votre compte Shotgun et accedez a la page{" "}
-                <strong className="font-semibold text-white">Integrations</strong> en{" "}
+                {t("home.step1Before")}{" "}
+                <strong className="font-semibold text-white">
+                  {t("home.step1Integrations")}
+                </strong>{" "}
+                {t("home.step1After")}{" "}
                 <Link
                   href={SHOTGUN_INTEGRATIONS_URL}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-white transition-colors hover:text-white/80"
                 >
-                  cliquant ici
+                  {t("home.step1Link")}
                   <ArrowUpRight className="size-3.5" />
                 </Link>
               </p>
               <p>
-                2. Activez <strong className="font-semibold text-white">Shotgun APIs</strong>,
-                copiez le jeton puis collez-le ici.
+                <Trans
+                  i18nKey="home.step2"
+                  components={{
+                    strong: <strong className="font-semibold text-white" />,
+                  }}
+                />
               </p>
             </div>
 
@@ -155,7 +124,7 @@ export function HomePageClient() {
                     id="token"
                     type="password"
                     autoComplete="off"
-                    placeholder="eyJhbGci..."
+                    placeholder={t("home.tokenPlaceholder")}
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     required
@@ -172,16 +141,21 @@ export function HomePageClient() {
                     className="h-12 w-full rounded-2xl bg-white text-black hover:bg-white/90"
                     disabled={loading || !token.trim()}
                   >
-                    {loading ? "Verification du token..." : "Se connecter"}
+                    {loading ? t("home.submitLoading") : t("home.submit")}
                   </Button>
                 </form>
               </CardContent>
             </Card>
           </section>
 
-          <section className="xl:flex xl:flex-col xl:items-center xl:justify-center">
-            <div className="flex justify-center">
-              <TelegramPreview message={activeMessage} mode="group" />
+          <section className="flex min-w-0 flex-col items-center xl:justify-center">
+            <div className="flex w-full max-w-[23rem] flex-col gap-3">
+              <div className="hidden shrink-0 justify-end xl:flex">
+                <LanguageToggle className="border-white/15 bg-black/30" />
+              </div>
+              <div className="flex w-full min-w-0 justify-center overflow-x-hidden">
+                <TelegramPreview message={activeMessage} mode="group" />
+              </div>
             </div>
           </section>
         </div>

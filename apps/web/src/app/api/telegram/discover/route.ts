@@ -18,7 +18,10 @@ export async function POST(request: Request) {
 
     if (!token) {
       return NextResponse.json(
-        { error: "Ajoutez un Bot Token Telegram." },
+        {
+          error: "Ajoutez un Bot Token Telegram.",
+          errorKey: "missingBotToken",
+        },
         { status: 400 }
       );
     }
@@ -41,6 +44,7 @@ export async function POST(request: Request) {
           {
             error:
               "Impossible de detecter les chats car ce bot a deja un webhook actif.",
+            errorKey: "webhookActive",
           },
           { status: 409 }
         );
@@ -98,6 +102,9 @@ export async function POST(request: Request) {
     const message =
       error instanceof Error ? error.message : "Impossible de contacter Telegram.";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message, errorKey: "contactFailed" },
+      { status: 500 }
+    );
   }
 }

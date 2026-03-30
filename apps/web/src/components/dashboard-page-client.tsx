@@ -9,12 +9,15 @@ import {
 } from "react";
 import type { JSONContent } from "@tiptap/react";
 import { useRouter } from "next/navigation";
+import { Trans, useTranslation } from "react-i18next";
 import { Bot, Loader2, Pencil, User, Users } from "lucide-react";
 
+import type { DiscoveredChatSubtitleI18n } from "@/app/api/telegram/_lib";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageTemplateEditor } from "@/components/message-template-editor";
 import { ChannelSetupGuide } from "@/components/channel-setup-guide";
+import { LanguageToggle } from "@/components/language-toggle";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,7 +35,10 @@ import {
   readStoredTelegramConfig,
   saveStoredTelegramConfig,
 } from "@/lib/shotgun";
+import type { TFunction } from "i18next";
+
 import { apiGetConfig, apiUpdateConfig, apiUpdateTemplate } from "@/lib/api";
+import { resolveTelegramApiErrorMessage } from "@/lib/telegram-api-error";
 import { type SyncStatus } from "@/components/sync-indicator";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +47,8 @@ interface TelegramDetectedChat {
   type: "private" | "group" | "supergroup" | "channel";
   title: string;
   subtitle: string;
+  titleI18nKey?: "fallbackUser";
+  subtitleI18nKey?: DiscoveredChatSubtitleI18n;
 }
 
 interface TelegramDetectionResult {
@@ -85,23 +93,31 @@ function validatedChatFromStoredApi(
       : "private";
 
   const displayTitle = (title || "").trim() || id;
-  const subtitle =
-    chatType === "private" ? "Conversation privee" : "Groupe";
+  const subtitleI18nKey: DiscoveredChatSubtitleI18n =
+    chatType === "private"
+      ? "privateConversation"
+      : chatType === "channel"
+        ? "channel"
+        : chatType === "supergroup"
+          ? "supergroup"
+          : "group";
 
   return {
     id,
     type: chatType,
     title: displayTitle,
-    subtitle,
+    subtitle: "",
+    subtitleI18nKey,
   };
 }
 
 function DashboardMainSkeleton() {
+  const { t } = useTranslation();
   return (
     <main
       className="mx-auto max-w-6xl space-y-6 px-6 py-8"
       aria-busy="true"
-      aria-label="Chargement du tableau de bord"
+      aria-label={t("dashboard.skeletonAria")}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
@@ -117,7 +133,22 @@ function DashboardMainSkeleton() {
   );
 }
 
+function chatRowTitle(chat: TelegramDetectedChat, t: TFunction) {
+  if (chat.titleI18nKey === "fallbackUser") {
+    return t("telegram.title.fallbackUser", { id: chat.title });
+  }
+  return chat.title;
+}
+
+function chatRowSubtitle(chat: TelegramDetectedChat, t: TFunction) {
+  if (chat.subtitleI18nKey) {
+    return t(`telegram.subtitle.${chat.subtitleI18nKey}`);
+  }
+  return chat.subtitle;
+}
+
 export function DashboardPageClient() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
@@ -346,7 +377,7 @@ export function DashboardPageClient() {
     const normalizedToken = telegramToken.trim();
 
     if (!normalizedToken) {
-      setTelegramLookupError("Ajoutez d'abord votre Bot Token.");
+      setTelegramLookupError(t("dashboard.errAddTokenFirst"));
       setTelegramLookupResult(null);
       return;
     }
@@ -366,15 +397,16 @@ export function DashboardPageClient() {
 
       const payload = (await response.json()) as
         | TelegramDetectionResult
-        | { error?: string };
+        | { error?: string; errorKey?: string };
 
       if (!response.ok || !("bot" in payload)) {
         setTelegramLookupResult(null);
         setTelegramTokenValidated(false);
         setTelegramLookupError(
-          "error" in payload && payload.error
-            ? payload.error
-            : "Impossible de verifier ce bot Telegram."
+          resolveTelegramApiErrorMessage(
+            payload as { error?: string; errorKey?: string },
+            t
+          )
         );
         return;
       }
@@ -385,7 +417,7 @@ export function DashboardPageClient() {
       setEditingBotToken(false);
     } catch {
       setTelegramLookupResult(null);
-      setTelegramLookupError("Impossible de contacter Telegram.");
+      setTelegramLookupError(t("dashboard.errContactTelegram"));
       setTelegramTokenValidated(false);
     } finally {
       setTelegramLookupLoading(false);
@@ -397,17 +429,17 @@ export function DashboardPageClient() {
     const normalizedChatId = telegramChatId.trim();
 
     if (!normalizedToken) {
-      setTelegramChatValidationError("Ajoutez d'abord votre Bot Token.");
+      setTelegramChatValidationError(t("dashboard.errAddTokenFirst"));
       return;
     }
 
     if (!telegramTokenValidated) {
-      setTelegramChatValidationError("Validez d'abord votre Bot Token.");
+      setTelegramChatValidationError(t("dashboard.errValidateTokenFirst"));
       return;
     }
 
     if (!normalizedChatId) {
-      setTelegramChatValidationError("Choisissez ou renseignez un Chat ID.");
+      setTelegramChatValidationError(t("dashboard.errPickChatId"));
       return;
     }
 
@@ -427,15 +459,16 @@ export function DashboardPageClient() {
 
       const payload = (await response.json()) as
         | TelegramValidatedChatResult
-        | { error?: string };
+        | { error?: string; errorKey?: string };
 
       if (!response.ok || !("chat" in payload)) {
         setTelegramChatValidated(false);
         setTelegramValidatedChat(null);
         setTelegramChatValidationError(
-          "error" in payload && payload.error
-            ? payload.error
-            : "Impossible de valider ce chat Telegram."
+          resolveTelegramApiErrorMessage(
+            payload as { error?: string; errorKey?: string },
+            t
+          )
         );
         return;
       }
@@ -466,7 +499,7 @@ export function DashboardPageClient() {
     } catch {
       setTelegramChatValidated(false);
       setTelegramValidatedChat(null);
-      setTelegramChatValidationError("Impossible de valider ce chat Telegram.");
+      setTelegramChatValidationError(t("dashboard.errValidateChat"));
     } finally {
       setTelegramChatValidationLoading(false);
     }
@@ -492,7 +525,7 @@ export function DashboardPageClient() {
               ? savedBotUsername.startsWith("@")
                 ? savedBotUsername
                 : `@${savedBotUsername}`
-              : "Bot Telegram"}
+              : t("dashboard.botFallback")}
           </span>
           <button
             type="button"
@@ -500,16 +533,16 @@ export function DashboardPageClient() {
             className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
           >
             <Pencil className="size-3" />
-            Modifier
+            {t("dashboard.modify")}
           </button>
         </div>
       ) : (
         <div className="space-y-1.5">
-          <Label htmlFor="tg-token">Bot Token</Label>
+          <Label htmlFor="tg-token">{t("dashboard.botTokenLabel")}</Label>
           <Input
             id="tg-token"
             type="password"
-            placeholder="7103948261:AAF..."
+            placeholder={t("dashboard.botTokenPlaceholder")}
             value={telegramToken}
             onChange={(event) => {
               setTelegramToken(event.target.value);
@@ -529,7 +562,7 @@ export function DashboardPageClient() {
           {telegramLookupLoading && (
             <Loader2 className="size-3.5 animate-spin" />
           )}
-          Détecter mes chats
+          {t("dashboard.detectChats")}
         </Button>
         {telegramLookupResult?.bot && !botTokenIsLocked && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
@@ -544,7 +577,7 @@ export function DashboardPageClient() {
             onClick={() => setEditingBotToken(false)}
             className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
           >
-            Annuler
+            {t("dashboard.cancel")}
           </button>
         )}
       </div>
@@ -555,7 +588,9 @@ export function DashboardPageClient() {
     </div>
   );
   const chatIdIsLocked = telegramChatValidated && !editingChatId && telegramChatId.trim();
-  const chatDisplayName = telegramValidatedChat?.title || telegramChatId;
+  const chatDisplayName = telegramValidatedChat
+    ? chatRowTitle(telegramValidatedChat, t)
+    : telegramChatId;
   const chatIsGroup = telegramValidatedChat
     ? telegramValidatedChat.type !== "private"
     : telegramChatId.startsWith("-");
@@ -582,22 +617,26 @@ export function DashboardPageClient() {
         className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
       >
         <Pencil className="size-3" />
-        Modifier
+        {t("dashboard.modify")}
       </button>
     </div>
   ) : (
     <div className="space-y-3">
       {telegramLookupResult?.bot && !telegramLookupResult.bot.canJoinGroups && (
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
-          Ce bot ne peut pas rejoindre de groupes. Activez{" "}
-          <span className="font-semibold">/setjoingroups</span> dans BotFather.
+          <Trans
+            i18nKey="dashboard.joinGroupsWarning"
+            components={{
+              cmd: <span className="font-semibold" />,
+            }}
+          />
         </div>
       )}
 
       {telegramLookupResult && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            Cliquez sur le bon chat pour remplir le Chat ID.
+            {t("dashboard.pickChatHint")}
           </p>
 
           {telegramLookupResult.chats.length > 0 ? (
@@ -630,10 +669,12 @@ export function DashboardPageClient() {
                         ) : (
                           <Users className="size-3.5 text-muted-foreground" />
                         )}
-                        <p className="truncate text-sm font-medium">{chat.title}</p>
+                        <p className="truncate text-sm font-medium">
+                          {chatRowTitle(chat, t)}
+                        </p>
                       </div>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {chat.subtitle}
+                        {chatRowSubtitle(chat, t)}
                       </p>
                     </div>
                     <span className="text-[11px] text-muted-foreground">
@@ -645,19 +686,18 @@ export function DashboardPageClient() {
             </div>
           ) : (
             <div className="rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5 text-xs text-muted-foreground">
-              Aucun chat detecte. Envoyez un message a votre bot ou dans votre
-              groupe, puis relancez.
+              {t("dashboard.noChatsHint")}
             </div>
           )}
         </div>
       )}
 
       <div className="space-y-1.5">
-        <Label htmlFor="tg-chat">Chat ID</Label>
+        <Label htmlFor="tg-chat">{t("dashboard.chatIdLabel")}</Label>
         <Input
           id="tg-chat"
           type="text"
-          placeholder="123456789 ou -1001234567890"
+          placeholder={t("dashboard.chatIdPlaceholder")}
           value={telegramChatId}
           onChange={(event) => {
             setTelegramChatId(event.target.value);
@@ -673,7 +713,7 @@ export function DashboardPageClient() {
       <div className="flex items-center gap-3">
         {channelSaved && (
           <span className="text-xs text-emerald-400">
-            Configuration enregistree
+            {t("dashboard.saved")}
           </span>
         )}
         <Button
@@ -685,7 +725,7 @@ export function DashboardPageClient() {
           {telegramChatValidationLoading && (
             <Loader2 className="size-3.5 animate-spin" />
           )}
-          Enregistrer
+          {t("dashboard.save")}
         </Button>
         {editingChatId && (
           <button
@@ -693,7 +733,7 @@ export function DashboardPageClient() {
             onClick={() => setEditingChatId(false)}
             className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
           >
-            Annuler
+            {t("dashboard.cancel")}
           </button>
         )}
       </div>
@@ -703,18 +743,21 @@ export function DashboardPageClient() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <h1 className="text-lg font-semibold">Shotgun Notifier</h1>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              clearStoredShotgunToken();
-              router.replace("/");
-            }}
-          >
-            Deconnexion
-          </Button>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-4">
+          <h1 className="text-lg font-semibold">{t("dashboard.title")}</h1>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                clearStoredShotgunToken();
+                router.replace("/");
+              }}
+            >
+              {t("dashboard.logout")}
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -722,9 +765,11 @@ export function DashboardPageClient() {
       <main className="mx-auto max-w-6xl space-y-6 px-6 py-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold">Configuration Telegram</h2>
+            <h2 className="text-2xl font-bold">
+              {t("dashboard.sectionTelegramTitle")}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Connectez votre bot pour recevoir les alertes de vente.
+              {t("dashboard.sectionTelegramSubtitle")}
             </p>
           </div>
 
@@ -734,7 +779,9 @@ export function DashboardPageClient() {
               size="sm"
               onClick={() => setTelegramConfigExpanded((current) => !current)}
             >
-              {telegramConfigExpanded ? "Réduire" : "Modifier"}
+              {telegramConfigExpanded
+                ? t("dashboard.collapse")
+                : t("dashboard.edit")}
             </Button>
           )}
         </div>
@@ -744,10 +791,12 @@ export function DashboardPageClient() {
             {showTelegramSummaryBar && (
               <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
                 <p className="text-sm font-medium text-foreground">
-                  Telegram connecte
+                  {t("dashboard.telegramConnected")}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {telegramValidatedChat?.title || telegramChatId}
+                  {telegramValidatedChat
+                    ? chatRowTitle(telegramValidatedChat, t)
+                    : telegramChatId}
                 </p>
               </div>
             )}
@@ -782,9 +831,11 @@ export function DashboardPageClient() {
         {showMessageTemplate && (
           <>
             <div>
-              <h2 className="text-2xl font-bold">Message de notification</h2>
+              <h2 className="text-2xl font-bold">
+                {t("dashboard.messageSectionTitle")}
+              </h2>
               <p className="text-sm text-muted-foreground">
-                Ecrivez votre message en ajoutant les informations a afficher.
+                {t("dashboard.messageSectionSubtitle")}
               </p>
             </div>
 

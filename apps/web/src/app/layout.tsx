@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { Providers } from "@/app/providers";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
@@ -16,9 +17,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={cn("font-sans antialiased", geist.variable)}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

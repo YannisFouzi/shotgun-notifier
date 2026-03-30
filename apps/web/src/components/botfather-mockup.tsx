@@ -1,6 +1,15 @@
 "use client";
 
-import { ChevronLeft, EllipsisVertical, Mic, Paperclip, Search, Smile } from "lucide-react";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  ChevronLeft,
+  EllipsisVertical,
+  Mic,
+  Paperclip,
+  Search,
+  Smile,
+} from "lucide-react";
 
 interface Message {
   from: "user" | "botfather";
@@ -14,65 +23,35 @@ type MessagePart =
   | { type: "code"; value: string }
   | { type: "mono"; value: string };
 
-const CONVERSATION: Message[] = [
-  {
-    from: "user",
-    parts: [{ type: "text", value: "/newbot" }],
-    time: "10:26",
-  },
-  {
-    from: "botfather",
-    parts: [
-      { type: "text", value: "Alright. A new bot. How are we going to call it? Please choose a name for your bot." },
-    ],
-    time: "10:26",
-  },
-  {
-    from: "user",
-    parts: [{ type: "text", value: "Shotgun Notifier" }],
-    time: "10:26",
-  },
-  {
-    from: "botfather",
-    parts: [
-      { type: "text", value: "Good. Now let's choose a username for your bot. It must end in " },
-      { type: "mono", value: "bot" },
-      { type: "text", value: ". Like this, for example: TetrisBot or tetris_bot." },
-    ],
-    time: "10:26",
-  },
-  {
-    from: "user",
-    parts: [{ type: "text", value: "shotgun_notifier_bot" }],
-    time: "10:27",
-  },
-  {
-    from: "botfather",
-    parts: [
-      { type: "text", value: "Done! Congratulations on your new bot.\n\nUse this token to access the HTTP API:\n" },
-      { type: "code", value: "7103948261:AAFk9x_Qm2vLpR8dWnT4jYbKcZeXsHuNwOo" },
-      { type: "text", value: "\nKeep your token " },
-      { type: "bold", value: "secure" },
-      { type: "text", value: " and " },
-      { type: "bold", value: "store it safely" },
-      { type: "text", value: "." },
-    ],
-    time: "10:27",
-  },
-];
-
 function renderParts(parts: MessagePart[]) {
   return parts.map((part, i) => {
     if (part.type === "bold") {
-      return <strong key={i} className="font-semibold text-white">{part.value}</strong>;
+      return (
+        <strong key={i} className="font-semibold text-white">
+          {part.value}
+        </strong>
+      );
     }
     if (part.type === "code") {
-      return <span key={i} className="rounded bg-[#1a2530] px-1 py-0.5 font-mono text-[11px] text-[#6ab7f5]">{part.value}</span>;
+      return (
+        <span
+          key={i}
+          className="rounded bg-[#1a2530] px-1 py-0.5 font-mono text-[11px] text-[#6ab7f5]"
+        >
+          {part.value}
+        </span>
+      );
     }
     if (part.type === "mono") {
-      return <span key={i} className="rounded bg-[#1a2530] px-1 py-0.5 font-mono text-[11px] text-[#e4e6eb]">{part.value}</span>;
+      return (
+        <span
+          key={i}
+          className="rounded bg-[#1a2530] px-1 py-0.5 font-mono text-[11px] text-[#e4e6eb]"
+        >
+          {part.value}
+        </span>
+      );
     }
-    // text — handle newlines
     return part.value.split("\n").map((line, j) => (
       <span key={`${i}-${j}`}>
         {j > 0 && <br />}
@@ -83,9 +62,60 @@ function renderParts(parts: MessagePart[]) {
 }
 
 export function BotFatherMockup() {
+  const { i18n } = useTranslation();
+  /** BotFather’s real flow is in English; longer FR copy overflowed the fixed-height mockup. */
+  const tBf = useMemo(() => i18n.getFixedT("en"), [i18n]);
+
+  const conversation = useMemo<Message[]>(
+    () => [
+      {
+        from: "user",
+        parts: [{ type: "text", value: tBf("bf.m0") }],
+        time: "10:26",
+      },
+      {
+        from: "botfather",
+        parts: [{ type: "text", value: tBf("bf.m1") }],
+        time: "10:26",
+      },
+      {
+        from: "user",
+        parts: [{ type: "text", value: tBf("bf.m2") }],
+        time: "10:26",
+      },
+      {
+        from: "botfather",
+        parts: [
+          { type: "text", value: tBf("bf.m3a") },
+          { type: "mono", value: "bot" },
+          { type: "text", value: tBf("bf.m3b") },
+        ],
+        time: "10:26",
+      },
+      {
+        from: "user",
+        parts: [{ type: "text", value: tBf("bf.m4") }],
+        time: "10:27",
+      },
+      {
+        from: "botfather",
+        parts: [
+          { type: "text", value: tBf("bf.m5a") },
+          { type: "code", value: tBf("bf.token") },
+          { type: "text", value: tBf("bf.m5b") },
+          { type: "bold", value: tBf("bf.m5c") },
+          { type: "text", value: tBf("bf.m5d") },
+          { type: "bold", value: tBf("bf.m5e") },
+          { type: "text", value: tBf("bf.m5f") },
+        ],
+        time: "10:27",
+      },
+    ],
+    [tBf]
+  );
+
   return (
     <div className="mx-auto flex h-[42rem] w-[23rem] shrink-0 flex-col overflow-hidden rounded-[2.2rem] border border-black/20 bg-[#17212b] shadow-[0_28px_60px_rgba(0,0,0,0.38)]">
-      {/* Status bar */}
       <div className="bg-[#17212b] px-4 pb-0 pt-3 text-white">
         <div className="flex items-center justify-between text-[0.7rem] font-semibold tracking-[0.02em]">
           <span>9:41</span>
@@ -104,9 +134,12 @@ export function BotFatherMockup() {
         </div>
       </div>
 
-      {/* Header */}
       <div className="flex items-center gap-2 border-b border-[#101a23] bg-[#17212b] px-2 py-2">
-        <button type="button" className="grid size-8 place-items-center text-[#6ab7f5]" aria-label="Retour">
+        <button
+          type="button"
+          className="grid size-8 place-items-center text-[#6ab7f5]"
+          aria-label={tBf("bf.back")}
+        >
           <ChevronLeft className="size-5" strokeWidth={2.5} />
         </button>
         <div className="grid size-9 shrink-0 place-items-center rounded-full bg-[#5288c1]">
@@ -115,11 +148,15 @@ export function BotFatherMockup() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
             <span className="text-sm font-medium text-white">BotFather</span>
-            <svg className="size-3.5 text-[#6ab7f5]" viewBox="0 0 24 24" fill="currentColor">
+            <svg
+              className="size-3.5 text-[#6ab7f5]"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
             </svg>
           </div>
-          <span className="text-[11px] text-[#708499]">bot</span>
+          <span className="text-[11px] text-[#708499]">{tBf("bf.headerSubtitle")}</span>
         </div>
         <div className="flex items-center gap-0.5 text-[#aaaaaa]">
           <Search className="size-5" strokeWidth={1.8} />
@@ -127,13 +164,14 @@ export function BotFatherMockup() {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto bg-[#0e1621] px-3 py-3">
         <div className="space-y-1.5">
-          {CONVERSATION.map((msg, i) => (
+          {conversation.map((msg, i) => (
             <div
               key={i}
-              className={msg.from === "user" ? "flex justify-end" : "flex justify-start"}
+              className={
+                msg.from === "user" ? "flex justify-end" : "flex justify-start"
+              }
             >
               <div
                 className={
@@ -148,7 +186,13 @@ export function BotFatherMockup() {
                 <div className="mt-0.5 flex items-center justify-end gap-1">
                   <span className="text-[10px] text-[#708499]">{msg.time}</span>
                   {msg.from === "user" && (
-                    <svg className="size-3 text-[#6ab7f5]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      className="size-3 text-[#6ab7f5]"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M2 8.5l3 3 5-6M6 11.5l1 1 5-6" />
                     </svg>
                   )}
@@ -159,12 +203,11 @@ export function BotFatherMockup() {
         </div>
       </div>
 
-      {/* Input area */}
       <div className="bg-[#17212b] px-3 py-2.5">
         <div className="flex items-center gap-2">
           <Paperclip className="size-5 text-[#aaaaaa]" strokeWidth={1.8} />
           <div className="flex min-h-9 flex-1 items-center rounded-xl bg-[#0e1621] px-3">
-            <span className="text-sm text-[#708499]">Message</span>
+            <span className="text-sm text-[#708499]">{tBf("bf.inputPlaceholder")}</span>
           </div>
           <div className="flex items-center gap-1 text-[#aaaaaa]">
             <Smile className="size-5" strokeWidth={1.8} />

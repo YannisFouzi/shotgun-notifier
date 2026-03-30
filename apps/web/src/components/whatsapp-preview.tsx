@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import {
   BatteryFull,
   Camera,
@@ -9,7 +10,6 @@ import {
   Mic,
   Paperclip,
   Phone,
-  Search,
   SignalHigh,
   Smile,
   Video,
@@ -33,26 +33,32 @@ const WALLPAPER_STYLE = {
   backgroundSize: "34px 34px, 42px 42px, 56px 56px, 100% 100%",
 } satisfies React.CSSProperties;
 
-function getPreviewTime() {
-  return new Intl.DateTimeFormat("fr-FR", {
+function timeLocaleTag(lng: string) {
+  return lng.startsWith("fr") ? "fr-FR" : "en-GB";
+}
+
+function getPreviewTime(localeTag: string) {
+  return new Intl.DateTimeFormat(localeTag, {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date());
 }
 
-function getPreviousTime() {
+function getPreviousTime(localeTag: string) {
   const d = new Date();
   d.setMinutes(d.getMinutes() - 12);
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(localeTag, {
     hour: "2-digit",
     minute: "2-digit",
   }).format(d);
 }
 
 export function WhatsAppPreview({ message, mode = "bot" }: WhatsAppPreviewProps) {
-  const renderedMessage = message || "Votre message apparaitra ici.";
-  const previewTime = getPreviewTime();
-  const prevTime = getPreviousTime();
+  const { t, i18n } = useTranslation();
+  const localeTag = timeLocaleTag(i18n.resolvedLanguage || i18n.language || "en");
+  const renderedMessage = message || t("telegramPreview.emptyMessage");
+  const previewTime = getPreviewTime(localeTag);
+  const prevTime = getPreviousTime(localeTag);
   const isGroup = mode === "group";
 
   return (
@@ -71,38 +77,54 @@ export function WhatsAppPreview({ message, mode = "bot" }: WhatsAppPreviewProps)
           <button
             type="button"
             className="grid size-8 place-items-center rounded-full text-white/90"
-            aria-label="Retour"
+            aria-label={t("telegramPreview.back")}
           >
             <ChevronLeft className="size-5" strokeWidth={2.5} />
           </button>
 
           {isGroup ? (
             <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#00a884] text-sm font-semibold text-white">
-              OE
+              {t("telegramPreview.groupInitials")}
             </div>
           ) : (
             <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#25d366] text-sm font-semibold text-[#0b141a]">
-              SG
+              {t("telegramPreview.botInitials")}
             </div>
           )}
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">
-              {isGroup ? "Orga Events" : "Shotgun Notifier"}
+              {isGroup
+                ? t("telegramPreview.groupTitle")
+                : t("telegramPreview.senderBot")}
             </p>
             <p className="truncate text-[11px] text-white/70">
-              {isGroup ? "Lucas, Marie, Shotgun Notifier" : "compte business"}
+              {isGroup
+                ? t("whatsappPreview.groupParticipants")
+                : t("whatsappPreview.businessSubtitle")}
             </p>
           </div>
 
           <div className="flex items-center gap-0.5 text-white/90">
-            <button type="button" className="grid size-8 place-items-center rounded-full" aria-label="Video">
+            <button
+              type="button"
+              className="grid size-8 place-items-center rounded-full"
+              aria-label={t("telegramPreview.video")}
+            >
               <Video className="size-4.5" strokeWidth={2.2} />
             </button>
-            <button type="button" className="grid size-8 place-items-center rounded-full" aria-label="Appel">
+            <button
+              type="button"
+              className="grid size-8 place-items-center rounded-full"
+              aria-label={t("telegramPreview.call")}
+            >
               <Phone className="size-4.5" strokeWidth={2.2} />
             </button>
-            <button type="button" className="grid size-8 place-items-center rounded-full" aria-label="Plus">
+            <button
+              type="button"
+              className="grid size-8 place-items-center rounded-full"
+              aria-label={t("telegramPreview.more")}
+            >
               <EllipsisVertical className="size-4.5" strokeWidth={2.2} />
             </button>
           </div>
@@ -111,13 +133,13 @@ export function WhatsAppPreview({ message, mode = "bot" }: WhatsAppPreviewProps)
 
       <div className="flex-1 px-3 py-4" style={WALLPAPER_STYLE}>
         <div className="mx-auto mb-4 w-fit rounded-full bg-[#dff0f8] px-3 py-1 text-[11px] font-medium text-[#54656f] shadow-[0_1px_1px_rgba(0,0,0,0.08)]">
-          Aujourd&apos;hui
+          {t("telegramPreview.today")}
         </div>
 
         {!isGroup && (
           <div className="mx-auto mb-4 flex max-w-[17.5rem] items-start gap-2 rounded-2xl bg-[#fff3c4] px-3 py-2 text-[11px] leading-4 text-[#54656f] shadow-[0_1px_1px_rgba(0,0,0,0.08)]">
             <Lock className="mt-0.5 size-3 shrink-0 text-[#667781]" />
-            <span>Les messages et appels sont chiffres de bout en bout.</span>
+            <span>{t("whatsappPreview.encryptionNotice")}</span>
           </div>
         )}
 
@@ -127,9 +149,11 @@ export function WhatsAppPreview({ message, mode = "bot" }: WhatsAppPreviewProps)
             <div className="mb-3 flex justify-start">
               <div className="relative max-w-[83%]">
                 <div className="rounded-[1.25rem] rounded-tl-[0.35rem] bg-white px-3.5 py-2 shadow-[0_1px_1px_rgba(0,0,0,0.12)]">
-                  <div className="mb-0.5 text-[11px] font-semibold text-[#e67e22]">Lucas</div>
+                  <div className="mb-0.5 text-[11px] font-semibold text-[#e67e22]">
+                    {t("telegramPreview.userLucas")}
+                  </div>
                   <div className="pr-10 text-[13px] leading-[1.45] text-[#111b21]">
-                    On en est ou des ventes ?
+                    {t("telegramPreview.msgLucas")}
                   </div>
                   <div className="mt-0.5 flex justify-end text-[11px] text-[#667781]">{prevTime}</div>
                 </div>
@@ -141,7 +165,7 @@ export function WhatsAppPreview({ message, mode = "bot" }: WhatsAppPreviewProps)
               <div className="relative max-w-[83%]">
                 <div className="rounded-[1.25rem] rounded-tr-[0.35rem] bg-[#d9fdd3] px-3.5 py-2 shadow-[0_1px_1px_rgba(0,0,0,0.12)]">
                   <div className="pr-10 text-[13px] leading-[1.45] text-[#111b21]">
-                    Le bot va nous dire ca
+                    {t("telegramPreview.msgMarie")}
                   </div>
                   <div className="mt-0.5 flex justify-end text-[11px] text-[#667781]">{prevTime}</div>
                 </div>
@@ -158,7 +182,9 @@ export function WhatsAppPreview({ message, mode = "bot" }: WhatsAppPreviewProps)
             )}
             <div className="relative rounded-[1.25rem] rounded-tl-[0.35rem] bg-white px-3.5 py-2.5 shadow-[0_1px_1px_rgba(0,0,0,0.12)]">
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#128c7e]">
-                {isGroup ? "Shotgun Notifier" : "Shotgun"}
+                {isGroup
+                  ? t("telegramPreview.senderBot")
+                  : t("whatsappPreview.senderShort")}
               </div>
               <div className="pr-10 text-[13px] leading-[1.45] whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#111b21]">
                 {renderedMessage}
@@ -178,7 +204,7 @@ export function WhatsAppPreview({ message, mode = "bot" }: WhatsAppPreviewProps)
           </div>
           <div className="flex min-h-11 flex-1 items-center gap-2 rounded-full bg-white px-3 text-[#667781] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
             <Paperclip className="size-4.5" strokeWidth={2} />
-            <span className="text-sm">Message</span>
+            <span className="text-sm">{t("telegramPreview.composerPlaceholder")}</span>
             <div className="ml-auto grid size-7 place-items-center rounded-full bg-[#f6f7f8]">
               <Camera className="size-4" strokeWidth={2} />
             </div>

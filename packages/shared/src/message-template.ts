@@ -313,12 +313,16 @@ export function getMessageTemplateVariablesForSection(
 }
 
 export function createMessageTemplateVariableNode(
-  key: string
+  key: string,
+  labelOverride?: string
 ): TemplateNode {
   const variable = getMessageTemplateVariable(key);
   return {
     type: SHOTGUN_VARIABLE_NODE_NAME,
-    attrs: { key, label: variable?.label || key },
+    attrs: {
+      key,
+      label: labelOverride ?? variable?.label ?? key,
+    },
   };
 }
 
@@ -454,12 +458,15 @@ function applyMessageTemplateSettings(
 export function renderMessageTemplatePreview(
   content: TemplateNode,
   context: Record<string, string> = SAMPLE_MESSAGE_TEMPLATE_CONTEXT,
-  settings: MessageTemplateSettings = DEFAULT_MESSAGE_TEMPLATE_SETTINGS
+  settings: MessageTemplateSettings = DEFAULT_MESSAGE_TEMPLATE_SETTINGS,
+  resolveLabel?: (key: string, fallbackLabel: string) => string
 ) {
   const resolved = applyMessageTemplateSettings(context, settings);
   return renderMessageTemplate(
     content,
-    (key, label) => resolved[key] || `[${label}]`
+    (key, label) =>
+      resolved[key] ||
+      `[${resolveLabel ? resolveLabel(key, label) : label}]`
   );
 }
 

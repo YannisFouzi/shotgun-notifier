@@ -47,11 +47,21 @@ interface TelegramApiError {
 
 type TelegramApiResponse<T> = TelegramApiSuccess<T> | TelegramApiError;
 
+export type DiscoveredChatSubtitleI18n =
+  | "privateConversation"
+  | "group"
+  | "supergroup"
+  | "channel";
+
 export interface DiscoveredChat {
   id: string;
   type: TelegramChat["type"];
   title: string;
   subtitle: string;
+  /** When set, the client should use i18n instead of `title`. */
+  titleI18nKey?: "fallbackUser";
+  /** When set, the client should use i18n instead of `subtitle`. */
+  subtitleI18nKey?: DiscoveredChatSubtitleI18n;
 }
 
 export function normalizeToken(value: unknown) {
@@ -99,36 +109,59 @@ export function extractChatFromUpdate(update: TelegramUpdate) {
 
 export function toDiscoveredChat(chat: TelegramChat): DiscoveredChat {
   if (chat.type === "private") {
-    const privateTitle =
-      chat.username
-        ? `@${chat.username}`
-        : [chat.first_name, chat.last_name].filter(Boolean).join(" ") ||
-          `Utilisateur ${chat.id}`;
+    const name = [chat.first_name, chat.last_name].filter(Boolean).join(" ");
 
-    const privateSubtitle =
-      [chat.first_name, chat.last_name].filter(Boolean).join(" ") ||
-      "Conversation privee";
+    if (chat.username) {
+      const title = `@${chat.username}`;
+      if (name) {
+        return {
+          id: String(chat.id),
+          type: chat.type,
+          title,
+          subtitle: name,
+        };
+      }
+      return {
+        id: String(chat.id),
+        type: chat.type,
+        title,
+        subtitle: "",
+        subtitleI18nKey: "privateConversation",
+      };
+    }
+
+    if (name) {
+      return {
+        id: String(chat.id),
+        type: chat.type,
+        title: name,
+        subtitle: name,
+      };
+    }
 
     return {
       id: String(chat.id),
       type: chat.type,
-      title: privateTitle,
-      subtitle: privateSubtitle,
+      title: String(chat.id),
+      titleI18nKey: "fallbackUser",
+      subtitle: "",
+      subtitleI18nKey: "privateConversation",
     };
   }
 
-  const typeLabel =
+  const subtitleI18nKey: DiscoveredChatSubtitleI18n =
     chat.type === "channel"
-      ? "Canal"
+      ? "channel"
       : chat.type === "supergroup"
-        ? "Supergroupe"
-        : "Groupe";
+        ? "supergroup"
+        : "group";
 
   return {
     id: String(chat.id),
     type: chat.type,
-    title: chat.title || `${typeLabel} ${chat.id}`,
-    subtitle: typeLabel,
+    title: chat.title || String(chat.id),
+    subtitle: "",
+    subtitleI18nKey,
   };
 }
 

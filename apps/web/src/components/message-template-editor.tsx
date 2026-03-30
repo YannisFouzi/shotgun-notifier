@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
@@ -22,6 +23,7 @@ import {
   getMessageTemplateVariablesForSection,
   MESSAGE_TEMPLATE_PRESETS,
   MESSAGE_TEMPLATE_SECTIONS,
+  SAMPLE_MESSAGE_TEMPLATE_CONTEXT,
   renderMessageTemplatePreview,
   type MessageTemplateSettings,
   type MessageTemplateVariable,
@@ -35,12 +37,20 @@ const VARIABLE_DRAG_MIME = "application/x-shotgun-variable";
 export type PreviewChannel = "whatsapp" | "telegram" | "messenger" | "discord";
 type PreviewMode = "bot" | "group";
 
-const PREVIEW_CHANNELS: { key: PreviewChannel; label: string; color: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; hidden?: boolean }[] = [
-  { key: "whatsapp", label: "WhatsApp", color: "#25d366", icon: WhatsAppIcon, hidden: true },
-  { key: "telegram", label: "Telegram", color: "#2AABEE", icon: TelegramIcon },
-  { key: "messenger", label: "Messenger", color: "#0084ff", icon: MessengerIcon, hidden: true },
-  { key: "discord", label: "Discord", color: "#5865F2", icon: DiscordIcon, hidden: true },
+const PREVIEW_CHANNELS: {
+  key: PreviewChannel;
+  labelKey: string;
+  color: string;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  hidden?: boolean;
+}[] = [
+  { key: "whatsapp", labelKey: "WhatsApp", color: "#25d366", icon: WhatsAppIcon, hidden: true },
+  { key: "telegram", labelKey: "Telegram", color: "#2AABEE", icon: TelegramIcon },
+  { key: "messenger", labelKey: "Messenger", color: "#0084ff", icon: MessengerIcon, hidden: true },
+  { key: "discord", labelKey: "Discord", color: "#5865F2", icon: DiscordIcon, hidden: true },
 ];
+
+const PRESET_SLUGS = ["minimal", "detailed", "pro"] as const;
 
 const CHIP_BASE =
   "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors cursor-grab active:cursor-grabbing";
@@ -78,6 +88,7 @@ export function MessageTemplateEditor({
   syncStatus,
   onSyncRetry,
 }: MessageTemplateEditorProps) {
+  const { t, i18n } = useTranslation();
   const [localPreview, setLocalPreview] = useState<PreviewChannel>(activePreview);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("group");
   const serializedValue = useMemo(() => JSON.stringify(value), [value]);
@@ -85,14 +96,32 @@ export function MessageTemplateEditor({
     () => extractMessageTemplateVariableKeys(value).includes("event_name"),
     [value]
   );
+
+  const sampleContext = useMemo(() => {
+    const ctx: Record<string, string> = { ...SAMPLE_MESSAGE_TEMPLATE_CONTEXT };
+    for (const k of Object.keys(ctx)) {
+      ctx[k] = t(`sampleContext.${k}`, { defaultValue: ctx[k] });
+    }
+    return ctx;
+  }, [t, i18n.language]);
+
   const previewMessage = useMemo(
-    () => renderMessageTemplatePreview(value),
-    [value]
+    () =>
+      renderMessageTemplatePreview(
+        value,
+        sampleContext,
+        settings,
+        (varKey, fb) =>
+          t(`variables.${varKey}.label`, { defaultValue: fb })
+      ),
+    [value, settings, sampleContext, t]
   );
+
   const presetOptions = useMemo(
     () =>
-      MESSAGE_TEMPLATE_PRESETS.map((preset) => ({
+      MESSAGE_TEMPLATE_PRESETS.map((preset, index) => ({
         ...preset,
+        slug: PRESET_SLUGS[index] ?? "minimal",
         isActive: JSON.stringify(preset.content) === serializedValue,
       })),
     [serializedValue]
@@ -102,35 +131,39 @@ export function MessageTemplateEditor({
     setLocalPreview(activePreview);
   }, [activePreview]);
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        blockquote: false,
-        bulletList: false,
-        codeBlock: false,
-        code: false,
-        heading: false,
-        horizontalRule: false,
-        orderedList: false,
-      }),
-      Placeholder.configure({
-        placeholder:
-          "Ecrivez votre notification ici, puis ajoutez les infos Shotgun avec les pastilles.",
-      }),
-      ShotgunVariableNode,
-    ],
-    content: value,
-    editorProps: {
+  const editorPlaceholder = t("editor.placeholder");
+
+  const editor = useEditor(
+    {
+      immediatelyRender: false,
+      extensions: [
+        StarterKit.configure({
+          blockquote: false,
+          bulletList: false,
+          codeBlock: false,
+          code: false,
+          heading: false,
+          horizontalRule: false,
+          orderedList: false,
+        }),
+        Placeholder.configure({
+          placeholder: editorPlaceholder,
+        }),
+        ShotgunVariableNode,
+      ],
+      content: value,
+      editorProps: {
         attributes: {
           class:
             "sg-template-editor min-h-[10rem] cursor-text rounded-2xl border border-border/80 bg-background/80 py-3 pl-4 pr-24 text-sm leading-7 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] outline-none transition-colors [&_p]:min-h-[1.5rem] [&_p+p]:mt-3",
         },
       },
-    onUpdate: ({ editor }) => {
-      onChange(editor.getJSON());
+      onUpdate: ({ editor }) => {
+        onChange(editor.getJSON());
+      },
     },
-  });
+    [editorPlaceholder]
+  );
 
   useEffect(() => {
     if (!editor) {
@@ -152,7 +185,10 @@ export function MessageTemplateEditor({
     }
 
     const content: JSONContent[] = [
-      createMessageTemplateVariableNode(variable.key),
+      createMessageTemplateVariableNode(
+        variable.key,
+        t(`variables.${variable.key}.label`, { defaultValue: variable.label })
+      ),
       {
         type: "text",
         text: " ",
@@ -222,15 +258,17 @@ export function MessageTemplateEditor({
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
       <div className="rounded-[28px] border border-border/80 p-4">
         <div className="border-b border-border/70 pb-3">
-          <Label>Message</Label>
+          <Label>{t("editor.messageLabel")}</Label>
         </div>
 
         <div className="mt-4 flex items-center gap-2">
-          <span className="text-xs font-medium text-foreground">Modele</span>
+          <span className="text-xs font-medium text-foreground">
+            {t("editor.templateLabel")}
+          </span>
           <div className="flex gap-1.5">
             {presetOptions.map((preset) => (
               <button
-                key={preset.label}
+                key={preset.slug}
                 type="button"
                 onClick={() => applyPreset(preset.content)}
                 className={cn(
@@ -240,7 +278,7 @@ export function MessageTemplateEditor({
                     : "border-border/60 text-muted-foreground hover:border-foreground/20 hover:text-foreground"
                 )}
               >
-                {preset.label}
+                {t(`editor.presets.${preset.slug}`)}
               </button>
             ))}
           </div>
@@ -258,7 +296,7 @@ export function MessageTemplateEditor({
             className="absolute top-3 right-3 z-10 rounded-full border-border/70 bg-background/90 hover:bg-muted/60"
             onClick={() => applyPreset({ type: "doc", content: [] })}
           >
-            Vider
+            {t("editor.clear")}
           </Button>
 
           <div
@@ -273,12 +311,12 @@ export function MessageTemplateEditor({
           <div className="mt-4 rounded-2xl border border-border/70 bg-background/50 px-3 py-3">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm leading-5 text-foreground/90">
-                Afficher le nom de l&apos;event seulement s&apos;il y a au moins 2 events prevus
+                {t("editor.eventNameRule")}
               </p>
               <button
                 type="button"
                 aria-pressed={settings.showEventNameOnlyWhenMultipleEvents}
-                aria-label="Afficher le nom de l'event seulement s'il y a au moins 2 events prevus"
+                aria-label={t("editor.eventNameRuleAria")}
                 onClick={toggleEventNameRule}
                 className={cn(
                   "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors",
@@ -302,7 +340,8 @@ export function MessageTemplateEditor({
 
         <div className="mt-4 border-t border-border/70 pt-4">
           <p className="text-xs text-foreground">
-            Cliquez sur une info pour l&apos;ajouter<span className="hidden lg:inline">, ou glissez-la directement dans le message</span>.
+            {t("editor.chipsHint")}
+            <span className="hidden lg:inline"> {t("editor.chipsHintDrag")}</span>
           </p>
 
           <div className="mt-2 space-y-2">
@@ -312,7 +351,7 @@ export function MessageTemplateEditor({
                   "shrink-0 text-[11px] font-semibold uppercase tracking-wider min-w-[4.5rem]",
                   SECTION_LABEL_STYLES[section.key] || "text-muted-foreground"
                 )}>
-                  {section.label}
+                  {t(`sections.${section.key}.label`)}
                 </span>
                 {getMessageTemplateVariablesForSection(section.key).map(
                   (variable) => (
@@ -320,7 +359,7 @@ export function MessageTemplateEditor({
                       key={variable.key}
                       type="button"
                       draggable
-                      title={`${variable.description} — ex: ${variable.example}`}
+                      title={`${t(`variables.${variable.key}.description`)} — ${t("editor.exampleInTitle")} ${t(`variables.${variable.key}.example`)}`}
                       onClick={() => insertVariable(variable)}
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = "copy";
@@ -330,7 +369,7 @@ export function MessageTemplateEditor({
                         );
                         event.dataTransfer.setData(
                           "text/plain",
-                          variable.label
+                          t(`variables.${variable.key}.label`)
                         );
                       }}
                       className={cn(
@@ -338,7 +377,7 @@ export function MessageTemplateEditor({
                         SECTION_CHIP_STYLES[section.key] || "border border-border/60 text-muted-foreground"
                       )}
                     >
-                      {variable.label}
+                      {t(`variables.${variable.key}.label`)}
                     </button>
                   )
                 )}
@@ -376,7 +415,7 @@ export function MessageTemplateEditor({
                     className="size-3.5"
                     style={isActive ? { color: channel.color } : undefined}
                   />
-                  <span className="hidden sm:inline">{channel.label}</span>
+                  <span className="hidden sm:inline">{channel.labelKey}</span>
                 </button>
               );
             })}
@@ -396,7 +435,7 @@ export function MessageTemplateEditor({
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Conversation bot
+              {t("editor.previewBot")}
             </button>
             <button
               type="button"
@@ -408,7 +447,7 @@ export function MessageTemplateEditor({
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Groupe existant
+              {t("editor.previewGroup")}
             </button>
           </div>
         )}

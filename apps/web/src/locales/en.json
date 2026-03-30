@@ -1,0 +1,247 @@
+{
+  "language": {
+    "en": "English",
+    "fr": "Français",
+    "toggleAria": "Language"
+  },
+  "home": {
+    "title": "Get a Telegram message for every Shotgun sale",
+    "subtitle": "Set up notifications in seconds.",
+    "step1Before": "1. Sign in to your Shotgun account and open the",
+    "step1Integrations": "Integrations",
+    "step1After": "page by",
+    "step1Link": "clicking here",
+    "step2": "2. Enable <strong>Shotgun APIs</strong>, copy the token, and paste it here.",
+    "tokenPlaceholder": "eyJhbGci...",
+    "errorInvalidToken": "Invalid token",
+    "errorValidateFailed": "Could not validate the token",
+    "submitLoading": "Verifying token…",
+    "submit": "Sign in"
+  },
+  "preview": {
+    "carousel0": "New Shotgun sale\n1 ticket sold : 57\nWAVE 2 : 4/200\n16.50 EUR",
+    "carousel1": "New Shotgun sale\n3 tickets sold : 60\nEARLY BIRD : 48/100\nWAVE 1 : 12/300\n49.50 EUR",
+    "carousel2": "New Shotgun sale\n2 tickets sold : 100\nEARLY BIRD : 100/100 SOLD OUT\nPayment : card",
+    "carousel3": "KODZ X GUETTAPEN X MERCI LILLE\nMay 1, 2026 - 21:00\n1 ticket sold : 57\nWAVE 2 : 4/200"
+  },
+  "dashboard": {
+    "title": "Shotgun Notifier",
+    "logout": "Log out",
+    "skeletonAria": "Loading dashboard",
+    "sectionTelegramTitle": "Telegram setup",
+    "sectionTelegramSubtitle": "Connect your bot to receive sale alerts.",
+    "collapse": "Collapse",
+    "edit": "Edit",
+    "telegramConnected": "Telegram connected",
+    "messageSectionTitle": "Notification message",
+    "messageSectionSubtitle": "Write your message and add the fields to show.",
+    "botFallback": "Telegram bot",
+    "modify": "Edit",
+    "cancel": "Cancel",
+    "botTokenLabel": "Bot token",
+    "botTokenPlaceholder": "7103948261:AAF...",
+    "detectChats": "Detect my chats",
+    "chatIdLabel": "Chat ID",
+    "chatIdPlaceholder": "123456789 or -1001234567890",
+    "pickChatHint": "Click the right chat to fill in the Chat ID.",
+    "noChatsHint": "No chats detected. Message your bot or your group, then try again.",
+    "save": "Save",
+    "saved": "Settings saved",
+    "joinGroupsWarning": "This bot cannot join groups. Enable <cmd>/setjoingroups</cmd> in BotFather.",
+    "errAddTokenFirst": "Add your bot token first.",
+    "errValidateTokenFirst": "Validate your bot token first.",
+    "errPickChatId": "Choose or enter a Chat ID.",
+    "errVerifyBot": "Could not verify this Telegram bot.",
+    "errContactTelegram": "Could not reach Telegram.",
+    "errValidateChat": "Could not validate this Telegram chat."
+  },
+  "errors": {
+    "telegram": {
+      "missingBotToken": "Add a Telegram bot token.",
+      "missingChatId": "Add a Telegram chat ID.",
+      "webhookActive": "Cannot detect chats because this bot already has an active webhook.",
+      "contactFailed": "Could not reach Telegram.",
+      "validateChatFailed": "Could not validate this chat. Make sure the bot is in the chat and a message was already sent.",
+      "validateGeneric": "Could not validate this Telegram chat.",
+      "generic": "Something went wrong."
+    }
+  },
+  "telegram": {
+    "subtitle": {
+      "privateConversation": "Private conversation",
+      "group": "Group",
+      "supergroup": "Supergroup",
+      "channel": "Channel"
+    },
+    "title": {
+      "fallbackUser": "User {{id}}"
+    }
+  },
+  "setup": {
+    "telegram": {
+      "step0": "Open Telegram and start a chat with",
+      "step1": "Send the <cmd>/newbot</cmd> command and follow the prompts: pick a <b>name</b> (e.g. Shotgun Notifier) then a <b>username</b> (e.g. shotgun_notifier_bot).",
+      "step2": "BotFather sends a message with your <b>Bot Token</b> (looks like <b>7103948261:AAF…</b>). Copy it and paste it in the field below.",
+      "step3": "To get your <b>Chat ID</b>, first have the bot receive a message in the right place.",
+      "colPrivateTitle": "Private",
+      "colPrivateBody": "Open your bot, send it a message, then click <b>Detect my chats</b>.",
+      "colGroupTitle": "Group",
+      "colGroupBody": "Add <b>your bot</b> to the group, send a message in that group, then click <b>Detect my chats</b>."
+    },
+    "discord": {
+      "step0": "Create a <b>webhook</b> in the target channel.",
+      "step1": "Copy the <b>webhook URL</b>."
+    },
+    "whatsapp": {
+      "step0": "Create a Meta app with <b>WhatsApp</b>.",
+      "step1": "Get the <b>Access Token</b> and <b>Phone Number ID</b>."
+    },
+    "messenger": {
+      "step0": "Create a Meta app with <b>Messenger</b>.",
+      "step1": "Get the <b>Page Access Token</b> and <b>PSID</b>."
+    },
+    "linkDiscordGuide": "Discord guide",
+    "linkMeta": "Meta",
+    "linkDoc": "Docs"
+  },
+  "bf": {
+    "back": "Back",
+    "headerSubtitle": "bot",
+    "inputPlaceholder": "Message",
+    "m0": "/newbot",
+    "m1": "Alright. A new bot. How are we going to call it? Please choose a name for your bot.",
+    "m2": "Shotgun Notifier",
+    "m3a": "Good. Now let's choose a username for your bot. It must end in ",
+    "m3b": ". Like this, for example: TetrisBot or tetris_bot.",
+    "m4": "shotgun_notifier_bot",
+    "m5a": "Done! Congratulations on your new bot.\n\nUse this token to access the HTTP API:\n",
+    "m5b": "\nKeep your token ",
+    "m5c": "secure",
+    "m5d": " and ",
+    "m5e": "store it safely",
+    "m5f": ".",
+    "token": "7103948261:AAFk9x_Qm2vLpR8dWnT4jYbKcZeXsHuNwOo"
+  },
+  "messengerPreview": {
+    "activeNow": "Active now",
+    "inputPlaceholder": "Aa"
+  },
+  "whatsappPreview": {
+    "encryptionNotice": "Messages and calls are end-to-end encrypted.",
+    "senderShort": "Shotgun",
+    "businessSubtitle": "Business account",
+    "groupParticipants": "Lucas, Marie, Shotgun Notifier"
+  },
+  "discordPreview": {
+    "composeHint": "Send a message in #{{channel}}",
+    "botTag": "BOT"
+  },
+  "telegramPreview": {
+    "back": "Back",
+    "search": "Search",
+    "call": "Call",
+    "video": "Video",
+    "more": "More",
+    "groupInitials": "OE",
+    "groupTitle": "Orga Events",
+    "groupMembers": "{{count}} members",
+    "botInitials": "SG",
+    "botTitle": "Shotgun Notifier",
+    "botSubtitle": "bot",
+    "today": "Today",
+    "userLucas": "Lucas",
+    "userMarie": "Marie",
+    "msgLucas": "How are sales going?",
+    "msgMarie": "The bot will tell us",
+    "senderBot": "Shotgun Notifier",
+    "emptyMessage": "Your message will appear here.",
+    "composerPlaceholder": "Message"
+  },
+  "sync": {
+    "retryTitle": "Click to retry"
+  },
+  "editor": {
+    "messageLabel": "Message",
+    "templateLabel": "Template",
+    "placeholder": "Write your notification here, then add Shotgun fields with the chips.",
+    "exampleInTitle": "e.g.",
+    "clear": "Clear",
+    "eventNameRule": "Show the event name only when there are at least 2 scheduled events",
+    "eventNameRuleAria": "Show event name only when at least 2 events are scheduled",
+    "chipsHint": "Click a field to add it.",
+    "chipsHintDrag": "Or drag it into the message.",
+    "previewBot": "Bot chat",
+    "previewGroup": "Existing group",
+    "removeChip": "Remove {{name}}",
+    "presets": {
+      "minimal": "Minimal",
+      "detailed": "Detailed",
+      "pro": "Pro"
+    }
+  },
+  "sections": {
+    "event": { "label": "Event", "description": "Name, date, venue, organizer…" },
+    "summary": { "label": "Sale", "description": "Tickets sold, total, amount…" },
+    "deal": { "label": "Tickets", "description": "Ticket type, price, wave summary…" },
+    "context": { "label": "Context", "description": "Payment, channel, marketing source…" }
+  },
+  "variables": {
+    "event_name": { "label": "Event name", "description": "Shotgun event title.", "example": "KODZ X GUETTAPEN X MERCI LILLE : REBELION, ECSTATIC & MORE" },
+    "event_date": { "label": "Date", "description": "Event date.", "example": "May 1, 2026" },
+    "event_start_time": { "label": "Start time", "description": "Event start time.", "example": "21:00" },
+    "event_end_time": { "label": "End time", "description": "Event end time.", "example": "04:00" },
+    "event_venue": { "label": "Venue", "description": "Venue name.", "example": "Kodz" },
+    "event_city": { "label": "City", "description": "Event city.", "example": "Englos" },
+    "organizer_name": { "label": "Organizer", "description": "Shotgun organizer name.", "example": "KODZ" },
+    "event_url": { "label": "Event link", "description": "Public Shotgun URL.", "example": "https://shotgun.live/events/guettapenmercililleinvitentrebelion" },
+    "event_id": { "label": "Event ID", "description": "Shotgun event identifier.", "example": "531055" },
+    "new_tickets_label": { "label": "Tickets sold (label)", "description": "Pre-formatted text for volume sold.", "example": "1 ticket sold" },
+    "new_tickets_count": { "label": "New tickets count", "description": "Number of tickets in this notification.", "example": "1" },
+    "event_total_sold": { "label": "Total tickets sold", "description": "Running total for the event.", "example": "57" },
+    "event_left_tickets": { "label": "Tickets left", "description": "Remaining stock from Shotgun.", "example": "2414" },
+    "new_tickets_revenue": { "label": "Sale amount", "description": "Estimated amount for this sale.", "example": "16.50 EUR" },
+    "currency": { "label": "Currency", "description": "Order currency.", "example": "EUR" },
+    "deal_lines": { "label": "Ticket summary", "description": "Pre-formatted block by ticket type.", "example": "WAVE 2 : 4/200" },
+    "first_deal_name": { "label": "Main ticket name", "description": "First ticket type detected.", "example": "WAVE 2" },
+    "first_deal_sold": { "label": "Sold on this ticket", "description": "Total sold on the main type.", "example": "4" },
+    "first_deal_max": { "label": "Capacity for this ticket", "description": "Max capacity of the main type.", "example": "200" },
+    "first_deal_price": { "label": "Main ticket price", "description": "Price for the main type.", "example": "16.50 EUR" },
+    "new_deal_names": { "label": "Sold ticket names", "description": "List of ticket types sold.", "example": "WAVE 2" },
+    "new_deals_count": { "label": "Number of types sold", "description": "Distinct ticket types.", "example": "1" },
+    "payment_methods": { "label": "Payment", "description": "Detected payment methods.", "example": "card" },
+    "sales_channels": { "label": "Sales channel", "description": "Detected sales channels.", "example": "online" },
+    "utm_sources": { "label": "Marketing source", "description": "Detected UTM source.", "example": "shotgun" },
+    "utm_mediums": { "label": "Marketing medium", "description": "Detected UTM medium.", "example": "website" },
+    "order_ids": { "label": "Order number", "description": "Related order IDs.", "example": "123456789" }
+  },
+  "sampleContext": {
+    "currency": "EUR",
+    "deal_lines": "WAVE 2 : 4/200",
+    "event_city": "Englos",
+    "event_date": "May 1, 2026",
+    "event_end_time": "04:00",
+    "event_id": "531055",
+    "event_left_tickets": "2414",
+    "event_name": "KODZ X GUETTAPEN X MERCI LILLE : REBELION, ECSTATIC & MORE",
+    "event_start_time": "21:00",
+    "event_total_sold": "57",
+    "event_url": "https://shotgun.live/events/guettapenmercililleinvitentrebelion",
+    "event_venue": "Kodz",
+    "first_deal_max": "200",
+    "first_deal_name": "WAVE 2",
+    "first_deal_price": "16.50 EUR",
+    "first_deal_sold": "4",
+    "new_deal_names": "WAVE 2",
+    "new_deals_count": "1",
+    "new_tickets_count": "1",
+    "new_tickets_label": "1 ticket sold",
+    "new_tickets_revenue": "16.50 EUR",
+    "order_ids": "123456789",
+    "organizer_name": "KODZ",
+    "payment_methods": "card",
+    "sales_channels": "online",
+    "utm_mediums": "website",
+    "utm_sources": "shotgun",
+    "scheduled_events_count": "1"
+  }
+}

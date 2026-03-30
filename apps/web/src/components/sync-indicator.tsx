@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
+
 import { cn } from "@/lib/utils";
 
 export type SyncStatus = "idle" | "pending" | "syncing" | "synced" | "error";
@@ -11,6 +13,8 @@ export function SyncIndicator({
   status: SyncStatus;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation();
+
   if (status === "idle" || status === "pending") return null;
 
   return (
@@ -18,7 +22,7 @@ export function SyncIndicator({
       type="button"
       onClick={status === "error" ? onRetry : undefined}
       disabled={status !== "error"}
-      title={status === "error" ? "Cliquez pour reessayer" : undefined}
+      title={status === "error" ? t("sync.retryTitle") : undefined}
       className={cn(
         "relative grid size-5 shrink-0 place-items-center",
         status === "error" && "cursor-pointer",
