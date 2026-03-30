@@ -15,6 +15,7 @@ import { Bot, Loader2, Pencil, Send, User, Users } from "lucide-react";
 import type { DiscoveredChatSubtitleI18n } from "@/app/api/telegram/_lib";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SettingsToggleRow } from "@/components/settings-toggle-row";
 import { Separator } from "@/components/ui/separator";
 import { MessageTemplateEditor } from "@/components/message-template-editor";
 import { ChannelSetupGuide } from "@/components/channel-setup-guide";
@@ -498,8 +499,8 @@ export function DashboardPageClient() {
       }
 
       const sendAsChatPref =
-        payload.chat.type === "private" ? false : telegramSendAsChat;
-      if (payload.chat.type === "private" && telegramSendAsChat) {
+        payload.chat.type === "channel" ? telegramSendAsChat : false;
+      if (payload.chat.type !== "channel" && telegramSendAsChat) {
         setTelegramSendAsChat(false);
       }
 
@@ -626,6 +627,7 @@ export function DashboardPageClient() {
   const chatIsGroup = telegramValidatedChat
     ? telegramValidatedChat.type !== "private"
     : telegramChatId.startsWith("-");
+  const chatIsChannel = telegramValidatedChat?.type === "channel";
 
   async function handleSendTelegramTest() {
     setTelegramTestStatus("loading");
@@ -647,7 +649,7 @@ export function DashboardPageClient() {
   }
 
   async function handleToggleTelegramSendAsChat(next: boolean) {
-    if (!telegramConfigured || !chatIsGroup) return;
+    if (!telegramConfigured || !chatIsChannel) return;
     const token = telegramToken.trim();
     const chatId = telegramChatId.trim();
     if (!token || !chatId) return;
@@ -900,47 +902,21 @@ export function DashboardPageClient() {
             {telegramConfigured && (
               <>
                 <Separator className="my-1" />
-                <div
-                  className={cn(
-                    "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4",
-                    !chatIsGroup && "text-muted-foreground"
-                  )}
-                >
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-sm font-medium text-foreground">
-                      {t("dashboard.sendAsChatLabel")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {chatIsGroup
-                        ? t("dashboard.sendAsChatHint")
-                        : t("dashboard.sendAsChatPrivateHint")}
-                    </p>
-                  </div>
-                  {chatIsGroup ? (
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={telegramSendAsChat}
-                      aria-busy={sendAsChatSaving}
-                      disabled={sendAsChatSaving}
-                      onClick={() => void handleToggleTelegramSendAsChat(!telegramSendAsChat)}
-                      className={cn(
-                        "relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-border/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                        telegramSendAsChat
-                          ? "bg-emerald-600/90"
-                          : "bg-muted",
-                        sendAsChatSaving && "pointer-events-none opacity-60"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "pointer-events-none absolute top-0.5 size-6 rounded-full bg-background shadow-sm transition-[transform]",
-                          telegramSendAsChat ? "translate-x-[1.375rem]" : "translate-x-0.5"
-                        )}
-                      />
-                    </button>
-                  ) : null}
-                </div>
+                <SettingsToggleRow
+                  variant="plain"
+                  label={t("dashboard.sendAsChatLabel")}
+                  description={
+                    chatIsChannel
+                      ? undefined
+                      : chatIsGroup
+                        ? t("dashboard.sendAsChatChannelsOnlyHint")
+                        : t("dashboard.sendAsChatPrivateHint")
+                  }
+                  pressed={telegramSendAsChat && chatIsChannel}
+                  onToggle={() => void handleToggleTelegramSendAsChat(!telegramSendAsChat)}
+                  disabled={!chatIsChannel || sendAsChatSaving}
+                  aria-label={t("dashboard.sendAsChatAria")}
+                />
 
                 <Separator className="my-1" />
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">

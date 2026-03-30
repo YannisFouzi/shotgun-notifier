@@ -29,6 +29,7 @@ import {
   type MessageTemplateVariable,
 } from "@/lib/message-template";
 import { ShotgunVariableNode } from "@/lib/shotgun-variable-node";
+import { SettingsToggleRow } from "@/components/settings-toggle-row";
 import { SyncIndicator, type SyncStatus } from "@/components/sync-indicator";
 import { cn } from "@/lib/utils";
 
@@ -308,34 +309,13 @@ export function MessageTemplateEditor({
         </div>
 
         {hasEventNameVariable ? (
-          <div className="mt-4 rounded-2xl border border-border/70 bg-background/50 px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm leading-5 text-foreground/90">
-                {t("editor.eventNameRule")}
-              </p>
-              <button
-                type="button"
-                aria-pressed={settings.showEventNameOnlyWhenMultipleEvents}
-                aria-label={t("editor.eventNameRuleAria")}
-                onClick={toggleEventNameRule}
-                className={cn(
-                  "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors",
-                  settings.showEventNameOnlyWhenMultipleEvents
-                    ? "border-foreground/10 bg-foreground"
-                    : "border-border/80 bg-muted/50"
-                )}
-              >
-                <span
-                  className={cn(
-                    "pointer-events-none inline-block size-5 rounded-full bg-background shadow-sm transition-transform",
-                    settings.showEventNameOnlyWhenMultipleEvents
-                      ? "translate-x-6"
-                      : "translate-x-1"
-                  )}
-                />
-              </button>
-            </div>
-          </div>
+          <SettingsToggleRow
+            className="mt-4"
+            label={t("editor.eventNameRule")}
+            pressed={settings.showEventNameOnlyWhenMultipleEvents}
+            onToggle={toggleEventNameRule}
+            aria-label={t("editor.eventNameRuleAria")}
+          />
         ) : null}
 
         <div className="mt-4 border-t border-border/70 pt-4">

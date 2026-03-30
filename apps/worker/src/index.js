@@ -284,14 +284,10 @@ function sqliteIntFlagIsOn(value) {
   return value === 1 || value === true || value === "1";
 }
 
-/** Groupe / supergroupe / canal uniquement (pas les MP). */
+/** Uniquement les canaux (affichage « au nom du chat » fiable côté Telegram). */
 function organizerTargetSupportsSendAsChat(organizer) {
   const type = String(organizer.telegram_chat_type || "").toLowerCase();
-  if (type === "group" || type === "supergroup" || type === "channel") {
-    return true;
-  }
-  const id = String(organizer.telegram_chat_id || "").trim();
-  return id.startsWith("-");
+  return type === "channel";
 }
 
 async function sendTelegram(telegramToken, chatId, text, options) {
