@@ -425,7 +425,12 @@ function renderInlineNodes(
 function normalizeRenderedMessage(value: string) {
   return value
     .split("\n")
-    .map((line) => line.replace(/[ \t]+$/g, ""))
+    .map((line) =>
+      line
+        // Espace double quand une variable vide disparaît en ligne (ex. nom d'event masqué)
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/[ \t]+$/g, "")
+    )
     .join("\n")
     .trim();
 }
@@ -437,7 +442,10 @@ function renderMessageTemplate(
   const blocks = (content.content || []).map((node) =>
     renderInlineNodes(node.content, resolver)
   );
-  return normalizeRenderedMessage(blocks.join("\n\n"));
+  // Paragraphes vides supprimés (ex. ligne avec seulement event_name masqué)
+  const visible = blocks.filter((block) => block.trim().length > 0);
+  // Un seul \n entre paragraphes → pas de « trou » entre l’intro et la suite
+  return normalizeRenderedMessage(visible.join("\n"));
 }
 
 function applyMessageTemplateSettings(
@@ -464,9 +472,12 @@ export function renderMessageTemplatePreview(
   const resolved = applyMessageTemplateSettings(context, settings);
   return renderMessageTemplate(
     content,
-    (key, label) =>
-      resolved[key] ||
-      `[${resolveLabel ? resolveLabel(key, label) : label}]`
+    (key, label) => {
+      if (Object.prototype.hasOwnProperty.call(resolved, key)) {
+        return resolved[key] ?? "";
+      }
+      return `[${resolveLabel ? resolveLabel(key, label) : label}]`;
+    }
   );
 }
 

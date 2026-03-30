@@ -908,7 +908,7 @@ async function handleTelegramTest(request, db) {
     organizerTargetSupportsSendAsChat(organizer);
 
   const text = sendAsChat
-    ? "Message de test\nSi tu lis ceci, l'envoi fonctionne (expediteur : groupe ou canal)."
+    ? "Message de test\nSi tu lis ceci, l'envoi fonctionne."
     : "Message de test\nSi tu lis ceci, l'envoi Telegram fonctionne.";
 
   try {
