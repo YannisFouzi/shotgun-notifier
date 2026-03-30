@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { JSONContent } from "@tiptap/react";
 import { useRouter } from "next/navigation";
 import { Bot, Loader2, User, Users } from "lucide-react";
@@ -26,6 +26,8 @@ import {
   readStoredTelegramConfig,
   saveStoredTelegramConfig,
 } from "@/lib/shotgun";
+import { apiGetConfig, apiUpdateConfig, apiUpdateTemplate } from "@/lib/api";
+import { type SyncStatus } from "@/components/sync-indicator";
 import { cn } from "@/lib/utils";
 
 interface TelegramDetectedChat {
@@ -66,7 +68,8 @@ export function DashboardPageClient() {
   const [telegramChatValidationError, setTelegramChatValidationError] =
     useState("");
   const [telegramChatValidated, setTelegramChatValidated] = useState(false);
-  const [telegramEditMode, setTelegramEditMode] = useState(false);
+  const [telegramConfigured, setTelegramConfigured] = useState(false);
+  const [telegramConfigExpanded, setTelegramConfigExpanded] = useState(true);
   const [channelSaved, setChannelSaved] = useState(false);
   const [messageTemplate, setMessageTemplate] = useState<JSONContent>(
     cloneMessageTemplateContent(DEFAULT_MESSAGE_TEMPLATE_CONTENT)
@@ -74,31 +77,107 @@ export function DashboardPageClient() {
   const [messageTemplateSettings, setMessageTemplateSettings] =
     useState<MessageTemplateSettings>(DEFAULT_MESSAGE_TEMPLATE_SETTINGS);
   const [readyToAutosave, setReadyToAutosave] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "pending" | "syncing" | "synced" | "error">("idle");
+  const syncRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const storedConfig = readStoredTelegramConfig();
-    const hasStoredTelegramConfig =
-      Boolean(storedConfig.telegramToken.trim()) &&
-      Boolean(storedConfig.telegramChatId.trim());
+    async function loadConfig() {
+      // Try loading from API first, fall back to localStorage
+      try {
+        const config = await apiGetConfig();
+        const tgToken = config.telegramToken || "";
+        const tgChatId = config.telegramChatId || "";
+        const hasConfig = Boolean(tgToken.trim()) && Boolean(tgChatId.trim());
 
-    setTelegramToken(storedConfig.telegramToken);
-    setTelegramChatId(storedConfig.telegramChatId);
-    setTelegramTokenValidated(hasStoredTelegramConfig);
-    setTelegramChatValidated(hasStoredTelegramConfig);
-    setTelegramEditMode(false);
-    setMessageTemplate(readStoredMessageTemplateContent());
-    setMessageTemplateSettings(readStoredMessageTemplateSettings());
-    setReadyToAutosave(true);
-  }, []);
+        setTelegramToken(tgToken);
+        setTelegramChatId(tgChatId);
+        setTelegramTokenValidated(hasConfig);
+        setTelegramChatValidated(hasConfig);
+        setTelegramConfigured(hasConfig);
+        setTelegramConfigExpanded(!hasConfig);
 
-  useEffect(() => {
-    if (!readyToAutosave) {
-      return;
+        const template = config.messageTemplate as JSONContent;
+        if (template && typeof template === "object" && template.type === "doc") {
+          setMessageTemplate(template);
+        } else {
+          setMessageTemplate(readStoredMessageTemplateContent());
+        }
+
+        const settings = config.messageTemplateSettings as MessageTemplateSettings;
+        if (settings && typeof settings === "object") {
+          setMessageTemplateSettings(settings);
+        } else {
+          setMessageTemplateSettings(readStoredMessageTemplateSettings());
+        }
+
+        // Sync to localStorage as cache
+        if (tgToken || tgChatId) {
+          saveStoredTelegramConfig(tgToken, tgChatId);
+        }
+      } catch {
+        // API unavailable — fall back to localStorage
+        const storedConfig = readStoredTelegramConfig();
+        const hasStoredTelegramConfig =
+          Boolean(storedConfig.telegramToken.trim()) &&
+          Boolean(storedConfig.telegramChatId.trim());
+
+        setTelegramToken(storedConfig.telegramToken);
+        setTelegramChatId(storedConfig.telegramChatId);
+        setTelegramTokenValidated(hasStoredTelegramConfig);
+        setTelegramChatValidated(hasStoredTelegramConfig);
+        setTelegramConfigured(hasStoredTelegramConfig);
+        setTelegramConfigExpanded(!hasStoredTelegramConfig);
+        setMessageTemplate(readStoredMessageTemplateContent());
+        setMessageTemplateSettings(readStoredMessageTemplateSettings());
+      }
+
+      setReadyToAutosave(true);
     }
 
+    loadConfig();
+  }, []);
+
+  const syncTemplateToApi = useCallback(
+    async (template: JSONContent, settings: MessageTemplateSettings) => {
+      setSyncStatus("syncing");
+      try {
+        await apiUpdateTemplate({
+          messageTemplate: template,
+          messageTemplateSettings: settings,
+        });
+        setSyncStatus("synced");
+        // Reset to idle after a brief "synced" flash
+        syncRetryRef.current = setTimeout(() => setSyncStatus("idle"), 2500);
+      } catch {
+        setSyncStatus("error");
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!readyToAutosave) return;
+
+    // Save to localStorage immediately
     saveStoredMessageTemplateContent(messageTemplate);
     saveStoredMessageTemplateSettings(messageTemplateSettings);
-  }, [messageTemplate, messageTemplateSettings, readyToAutosave]);
+
+    // Show pending state
+    setSyncStatus("pending");
+
+    // Clear any previous timers
+    if (syncRetryRef.current) {
+      clearTimeout(syncRetryRef.current);
+      syncRetryRef.current = null;
+    }
+
+    // Debounced save to API
+    const timer = setTimeout(() => {
+      syncTemplateToApi(messageTemplate, messageTemplateSettings);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [messageTemplate, messageTemplateSettings, readyToAutosave, syncTemplateToApi]);
 
   function resetTelegramProgress(options?: { clearChatId?: boolean }) {
     if (options?.clearChatId) {
@@ -213,10 +292,20 @@ export function DashboardPageClient() {
       }
 
       saveStoredTelegramConfig(normalizedToken, payload.chat.id);
+
+      // Push to Worker API so the cron uses these credentials
+      apiUpdateConfig({
+        telegramToken: normalizedToken,
+        telegramChatId: payload.chat.id,
+      }).catch(() => {
+        // API save failed silently — will retry on next save
+      });
+
       setTelegramChatId(payload.chat.id);
       setTelegramValidatedChat(payload.chat);
       setTelegramChatValidated(true);
-      setTelegramEditMode(false);
+      setTelegramConfigured(true);
+      setTelegramConfigExpanded(false);
       setChannelSaved(true);
       setTimeout(() => setChannelSaved(false), 2000);
     } catch {
@@ -228,9 +317,13 @@ export function DashboardPageClient() {
     }
   }
 
-  const showTelegramOnboarding = !telegramChatValidated && !telegramEditMode;
-  const showTelegramEdit = telegramEditMode;
-  const showMessageTemplate = telegramChatValidated || telegramEditMode;
+  function handleSyncRetry() {
+    syncTemplateToApi(messageTemplate, messageTemplateSettings);
+  }
+
+  const isTelegramSetupOpen = !telegramConfigured || telegramConfigExpanded;
+  const showTelegramSummaryBar = telegramConfigured && !telegramConfigExpanded;
+  const showMessageTemplate = telegramConfigured;
   const telegramTokenStepContent = (
     <div className="space-y-3">
       <div className="space-y-1.5">
@@ -400,56 +493,56 @@ export function DashboardPageClient() {
             </p>
           </div>
 
-          {telegramChatValidated && !telegramEditMode && (
+          {telegramConfigured && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setTelegramEditMode(true);
-                setTelegramLookupError("");
-                setTelegramChatValidationError("");
-                setChannelSaved(false);
-              }}
+              onClick={() => setTelegramConfigExpanded((current) => !current)}
             >
-              Modifier
+              {telegramConfigExpanded ? "Réduire" : "Modifier"}
             </Button>
           )}
         </div>
 
-        {showTelegramOnboarding ? (
-          <Card>
-            <CardContent className="space-y-4">
-              <ChannelSetupGuide
-                channelKey="telegram"
-                visibleSteps={telegramTokenValidated ? 4 : 3}
-                slots={{
-                  2: telegramTokenStepContent,
-                  ...(telegramTokenValidated ? { 3: telegramChatStepContent } : {}),
-                }}
-              />
-            </CardContent>
-          </Card>
-        ) : showTelegramEdit ? (
-          <Card>
-            <CardContent className="space-y-4">
-              <ChannelSetupGuide
-                channelKey="telegram"
-                visibleSteps={4}
-                slots={{
-                  2: telegramTokenStepContent,
-                  3: telegramChatStepContent,
-                }}
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-            <p className="text-sm font-medium text-foreground">Telegram connecte</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {telegramValidatedChat?.title || telegramChatId}
-            </p>
-          </div>
-        )}
+        <Card>
+          <CardContent className="space-y-4">
+            {showTelegramSummaryBar && (
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+                <p className="text-sm font-medium text-foreground">
+                  Telegram connecte
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {telegramValidatedChat?.title || telegramChatId}
+                </p>
+              </div>
+            )}
+
+            <div
+              className={cn(
+                "grid transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none",
+                isTelegramSetupOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              )}
+            >
+              <div
+                className="min-h-0 overflow-hidden"
+                inert={showTelegramSummaryBar ? true : undefined}
+              >
+                <ChannelSetupGuide
+                  channelKey="telegram"
+                  visibleSteps={
+                    telegramConfigured ? 4 : telegramTokenValidated ? 4 : 3
+                  }
+                  slots={{
+                    2: telegramTokenStepContent,
+                    ...((telegramConfigured || telegramTokenValidated)
+                      ? { 3: telegramChatStepContent }
+                      : {}),
+                  }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {showMessageTemplate && (
           <>
@@ -468,6 +561,8 @@ export function DashboardPageClient() {
                   value={messageTemplate}
                   onChange={setMessageTemplate}
                   onSettingsChange={setMessageTemplateSettings}
+                  syncStatus={syncStatus}
+                  onSyncRetry={handleSyncRetry}
                 />
               </CardContent>
             </Card>

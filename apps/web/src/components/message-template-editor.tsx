@@ -27,6 +27,7 @@ import {
   type MessageTemplateVariable,
 } from "@/lib/message-template";
 import { ShotgunVariableNode } from "@/lib/shotgun-variable-node";
+import { SyncIndicator, type SyncStatus } from "@/components/sync-indicator";
 import { cn } from "@/lib/utils";
 
 const VARIABLE_DRAG_MIME = "application/x-shotgun-variable";
@@ -64,6 +65,8 @@ interface MessageTemplateEditorProps {
   value: JSONContent;
   onChange: (content: JSONContent) => void;
   onSettingsChange: (settings: MessageTemplateSettings) => void;
+  syncStatus?: SyncStatus;
+  onSyncRetry?: () => void;
 }
 
 export function MessageTemplateEditor({
@@ -72,6 +75,8 @@ export function MessageTemplateEditor({
   value,
   onChange,
   onSettingsChange,
+  syncStatus,
+  onSyncRetry,
 }: MessageTemplateEditorProps) {
   const [localPreview, setLocalPreview] = useState<PreviewChannel>(activePreview);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("group");
@@ -239,6 +244,11 @@ export function MessageTemplateEditor({
               </button>
             ))}
           </div>
+          {syncStatus && onSyncRetry && (
+            <div className="ml-auto">
+              <SyncIndicator status={syncStatus} onRetry={onSyncRetry} />
+            </div>
+          )}
         </div>
 
         <div className="relative mt-4">

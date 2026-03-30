@@ -1,1 +1,25 @@
-export const VERSION = "shotgun-notifier-v2";
+export { VERSION } from "./version";
+export {
+  type MessageTemplateSection,
+  type MessageTemplateSectionMeta,
+  type MessageTemplateVariable,
+  type MessageTemplateSettings,
+  type MessageTemplatePreset,
+  type TemplateNode,
+  SHOTGUN_VARIABLE_NODE_NAME,
+  DEFAULT_MESSAGE_TEMPLATE_SETTINGS,
+  DEFAULT_MESSAGE_TEMPLATE_CONTENT,
+  MESSAGE_TEMPLATE_SECTIONS,
+  MESSAGE_TEMPLATE_VARIABLES,
+  MESSAGE_TEMPLATE_PRESETS,
+  SAMPLE_MESSAGE_TEMPLATE_CONTEXT,
+  getMessageTemplateVariable,
+  getMessageTemplateVariablesForSection,
+  createMessageTemplateVariableNode,
+  cloneTemplateContent,
+  renderMessageTemplatePreview,
+  renderMessageTemplateWithData,
+  serializeMessageTemplate,
+  extractMessageTemplateVariableKeys,
+  normalizeMessageTemplateSettings,
+} from "./message-template";

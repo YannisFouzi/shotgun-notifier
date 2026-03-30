@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@shotgun-notifier/shared": "*",
     "@base-ui/react": "^1.3.0",
     "@tiptap/core": "^3.21.0",
     "@tiptap/extension-placeholder": "^3.21.0",

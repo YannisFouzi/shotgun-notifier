@@ -1,8 +1,7 @@
 {
   "name": "notifshotgun",
-  "main": "src/worker_v2.js",
+  "main": "src/index.js",
   "workers_dev": true,
-  "preview_urls": false,
   "compatibility_date": "2025-08-28",
   "observability": {
     "enabled": true,
@@ -12,17 +11,13 @@
       "head_sampling_rate": 1,
       "persist": true,
       "invocation_logs": true
-    },
-    "traces": {
-      "enabled": false,
-      "persist": true,
-      "head_sampling_rate": 1
     }
   },
-  "kv_namespaces": [
+  "d1_databases": [
     {
-      "id": "eaeeedfd2fab4f2abce20ff4c9f4ebf4",
-      "binding": "SALES_KV"
+      "binding": "DB",
+      "database_name": "notifshotgun-db",
+      "database_id": "4588bc9e-dc7d-4bba-a750-055aea510ad9"
     }
   ],
   "triggers": {

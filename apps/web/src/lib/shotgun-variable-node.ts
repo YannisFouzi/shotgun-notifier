@@ -1,9 +1,10 @@
 import { mergeAttributes, Node } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
+import { SHOTGUN_VARIABLE_NODE_NAME } from "@shotgun-notifier/shared";
 
 import { ShotgunVariableChip } from "@/components/shotgun-variable-chip";
 
-export const SHOTGUN_VARIABLE_NODE_NAME = "shotgunVariable";
+export { SHOTGUN_VARIABLE_NODE_NAME };
 
 export interface ShotgunVariableNodeAttributes {
   key: string;

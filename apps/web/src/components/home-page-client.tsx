@@ -13,12 +13,11 @@ import { TelegramPreview } from "@/components/telegram-preview";
 // import { MessengerPreview } from "@/components/messenger-preview";
 // import { WhatsAppPreview } from "@/components/whatsapp-preview";
 import {
-  buildShotgunEventsUrl,
-  getOrganizerIdFromToken,
   normalizeShotgunToken,
   saveStoredShotgunToken,
   SHOTGUN_INTEGRATIONS_URL,
 } from "@/lib/shotgun";
+import { apiLogin, ApiError } from "@/lib/api";
 // Hidden — kept for future multi-platform support
 type PreviewChannel = "whatsapp" | "telegram" | "messenger" | "discord";
 type PreviewMode = "bot" | "group";
@@ -98,32 +97,17 @@ export function HomePageClient() {
 
     try {
       const normalizedToken = normalizeShotgunToken(token);
-      const organizerId = getOrganizerIdFromToken(normalizedToken);
 
-      if (!organizerId) {
-        setError("Token invalide");
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch(buildShotgunEventsUrl(normalizedToken, organizerId));
-
-      if (res.status === 401 || res.status === 403) {
-        setError("Token invalide");
-        setLoading(false);
-        return;
-      }
-
-      if (!res.ok) {
-        setError("Impossible de valider le token");
-        setLoading(false);
-        return;
-      }
+      await apiLogin(normalizedToken);
 
       saveStoredShotgunToken(normalizedToken);
       router.replace("/dashboard");
-    } catch {
-      setError("Impossible de valider le token");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setError("Token invalide");
+      } else {
+        setError("Impossible de valider le token");
+      }
       setLoading(false);
     }
   }
