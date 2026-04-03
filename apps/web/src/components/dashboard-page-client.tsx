@@ -35,6 +35,7 @@ import {
   type MessageTemplateSettings,
 } from "@/lib/message-template";
 import {
+  CHECK_INTERVAL_STORAGE_KEY,
   clearStoredShotgunToken,
   readStoredTelegramConfig,
   saveStoredTelegramConfig,
@@ -52,6 +53,8 @@ import {
 import { resolveTelegramApiErrorMessage } from "@/lib/telegram-api-error";
 import { type SyncStatus } from "@/components/sync-indicator";
 import { cn } from "@/lib/utils";
+
+const CHECK_INTERVAL_OPTIONS = [1, 5, 10, 60, 300, 720, 1440, 10080] as const;
 
 interface TelegramDetectedChat {
   id: string;
@@ -196,6 +199,8 @@ export function DashboardPageClient() {
   const [dashboardReady, setDashboardReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "pending" | "syncing" | "synced" | "error">("idle");
   const syncRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [checkInterval, setCheckInterval] = useState(1);
+  const [checkIntervalSaving, setCheckIntervalSaving] = useState(false);
 
   useLayoutEffect(() => {
     const stored = readStoredTelegramConfig();
@@ -251,6 +256,7 @@ export function DashboardPageClient() {
           )
         );
         setTelegramSendAsChat(Boolean(config.telegramSendAsChat));
+        setCheckInterval(config.checkInterval ?? 1);
 
         // Fetch bot info if we have a saved token
         if (tgToken.trim()) {
@@ -297,6 +303,7 @@ export function DashboardPageClient() {
             chatTitle: config.telegramChatTitle ?? "",
             chatType: config.telegramChatType ?? "",
             sendAsChat: Boolean(config.telegramSendAsChat),
+            checkInterval: config.checkInterval ?? 1,
           });
         }
       } catch {
@@ -320,6 +327,7 @@ export function DashboardPageClient() {
           )
         );
         setTelegramSendAsChat(storedConfig.telegramSendAsChat);
+        setCheckInterval(storedConfig.checkInterval ?? 1);
         setMessageTemplate(readStoredMessageTemplateContent());
         setMessageTemplateSettings(readStoredMessageTemplateSettings());
       } finally {
@@ -668,6 +676,26 @@ export function DashboardPageClient() {
     }
   }
 
+  async function handleCheckIntervalChange(nextInterval: number) {
+    if (!telegramConfigured) return;
+    const token = telegramToken.trim();
+    const chatId = telegramChatId.trim();
+    if (!token || !chatId) return;
+
+    const prev = checkInterval;
+    setCheckInterval(nextInterval);
+    saveStoredTelegramConfig(token, chatId, { checkInterval: nextInterval });
+    setCheckIntervalSaving(true);
+    try {
+      await apiUpdateConfig({ checkInterval: nextInterval });
+    } catch {
+      setCheckInterval(prev);
+      saveStoredTelegramConfig(token, chatId, { checkInterval: prev });
+    } finally {
+      setCheckIntervalSaving(false);
+    }
+  }
+
   const telegramChatStepContent = chatIdIsLocked ? (
     <div className="flex items-center gap-2">
       <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-medium text-emerald-300">
@@ -917,6 +945,43 @@ export function DashboardPageClient() {
                   disabled={!chatIsChannel || sendAsChatSaving}
                   aria-label={t("dashboard.sendAsChatAria")}
                 />
+
+                <Separator className="my-1" />
+                <div className="space-y-2">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {t("dashboard.checkFrequencyLabel")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("dashboard.checkFrequencyHint")}
+                    </p>
+                  </div>
+                  <div
+                    className="flex flex-wrap gap-1.5"
+                    role="radiogroup"
+                    aria-label={t("dashboard.checkFrequencyAria")}
+                  >
+                    {CHECK_INTERVAL_OPTIONS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        role="radio"
+                        aria-checked={checkInterval === option}
+                        disabled={checkIntervalSaving}
+                        onClick={() => void handleCheckIntervalChange(option)}
+                        className={cn(
+                          "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                          checkInterval === option
+                            ? "border-foreground/30 bg-foreground text-background"
+                            : "border-border/60 text-muted-foreground hover:border-foreground/20 hover:text-foreground",
+                          checkIntervalSaving && "pointer-events-none opacity-50"
+                        )}
+                      >
+                        {t(`dashboard.freq${option}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <Separator className="my-1" />
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">

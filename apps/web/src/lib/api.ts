@@ -90,6 +90,7 @@ interface ConfigResponse {
   telegramSendAsChat?: boolean;
   messageTemplate: unknown;
   messageTemplateSettings: unknown;
+  checkInterval?: number;
   isActive: boolean;
 }
 
@@ -110,6 +111,7 @@ export async function apiUpdateConfig(data: {
   telegramChatTitle?: string;
   telegramChatType?: string;
   telegramSendAsChat?: boolean;
+  checkInterval?: number;
 }): Promise<{ ok: boolean }> {
   return apiFetch("/api/config", {
     method: "PUT",

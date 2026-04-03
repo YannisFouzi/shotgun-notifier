@@ -19,6 +19,9 @@ const COUNTED_STATUSES = new Set(["valid", "resold"]);
 const BOOTSTRAP_MAX_PAGES = 200;
 const SYNC_MAX_PAGES_PER_RUN = 10;
 
+const CHECK_INTERVAL_OPTIONS = new Set([1, 5, 10, 60, 300, 720, 1440, 10080]);
+const DEFAULT_CHECK_INTERVAL = 1;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -517,7 +520,7 @@ async function bootstrapOrganizer(db, organizer) {
 // Incremental sync
 // ---------------------------------------------------------------------------
 
-async function syncOrganizer(db, organizer) {
+async function syncOrganizer(db, organizer, maxPagesPerEvent = SYNC_MAX_PAGES_PER_RUN) {
   const { id: organizerId, shotgun_token: shotgunToken } = organizer;
   const syncState = await getSyncState(db, organizerId);
   const cursor = syncState.cursor || "";
@@ -530,7 +533,7 @@ async function syncOrganizer(db, organizer) {
     let nextUrl = buildTicketsUrl(organizerId, cursor, event.id);
     let pages = 0;
 
-    while (nextUrl && pages < SYNC_MAX_PAGES_PER_RUN) {
+    while (nextUrl && pages < maxPagesPerEvent) {
       pages += 1;
       const json = await fetchJson(
         nextUrl, headers, `Shotgun incremental (event ${event.id})`
@@ -654,10 +657,15 @@ async function syncOrganizer(db, organizer) {
 
 async function runCron(db) {
   const { results: organizers } = await db
-    .prepare("SELECT * FROM organizers WHERE is_active = 1")
+    .prepare(
+      `SELECT * FROM organizers
+       WHERE is_active = 1
+         AND (last_checked_at = ''
+              OR (julianday('now') - julianday(last_checked_at)) * 1440 >= check_interval)`
+    )
     .all();
 
-  console.log(`[${VERSION}] Cron tick: ${organizers.length} active organizer(s)`);
+  console.log(`[${VERSION}] Cron tick: ${organizers.length} organizer(s) due`);
 
   const results = [];
 
@@ -673,7 +681,9 @@ async function runCron(db) {
           ok: true,
         });
       } else {
-        const syncResult = await syncOrganizer(db, organizer);
+        const interval = toInt(organizer.check_interval) || DEFAULT_CHECK_INTERVAL;
+        const maxPages = interval > 1 ? BOOTSTRAP_MAX_PAGES : SYNC_MAX_PAGES_PER_RUN;
+        const syncResult = await syncOrganizer(db, organizer, maxPages);
         results.push({
           organizerId: organizer.id,
           mode: "sync",
@@ -681,6 +691,12 @@ async function runCron(db) {
           ...syncResult,
         });
       }
+
+      // Mark this organizer as just checked
+      await db
+        .prepare("UPDATE organizers SET last_checked_at = datetime('now') WHERE id = ?")
+        .bind(organizer.id)
+        .run();
     } catch (error) {
       console.error(
         `[${VERSION}] Error for organizer ${organizer.id}:`,
@@ -760,6 +776,7 @@ async function handleGetConfig(request, db) {
     messageTemplateSettings: JSON.parse(
       organizer.message_template_settings || "{}"
     ),
+    checkInterval: toInt(organizer.check_interval) || DEFAULT_CHECK_INTERVAL,
     isActive: organizer.is_active === 1,
   });
 }
@@ -800,6 +817,10 @@ async function handleUpdateConfig(request, db) {
   if (body.messageTemplateSettings !== undefined) {
     updates.push("message_template_settings = ?");
     binds.push(JSON.stringify(body.messageTemplateSettings));
+  }
+  if (typeof body.checkInterval === "number" && CHECK_INTERVAL_OPTIONS.has(body.checkInterval)) {
+    updates.push("check_interval = ?");
+    binds.push(body.checkInterval);
   }
 
   if (updates.length === 0) {
