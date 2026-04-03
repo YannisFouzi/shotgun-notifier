@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { MessageTemplateEditor } from "@/components/message-template-editor";
 import { ChannelSetupGuide } from "@/components/channel-setup-guide";
 import { DeleteAccountSection } from "@/components/delete-account-dialog";
+import { FeedbackSection } from "@/components/feedback-section";
 import { SiteFooter } from "@/components/site-footer";
 import { LanguageToggle } from "@/components/language-toggle";
 import { Input } from "@/components/ui/input";
@@ -1048,6 +1049,8 @@ export function DashboardPageClient() {
             </Card>
           </>
         )}
+
+        <FeedbackSection />
 
         <DeleteAccountSection />
       </main>

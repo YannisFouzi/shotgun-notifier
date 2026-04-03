@@ -965,6 +965,75 @@ async function handleDeleteAccount(request, db) {
 }
 
 // ---------------------------------------------------------------------------
+// Feedback (Resend)
+// ---------------------------------------------------------------------------
+
+const FEEDBACK_TYPES = new Set(["bug", "feature"]);
+const FEEDBACK_SENDER = "ShotNotif <noreply@fouzi-dev.fr>";
+const FEEDBACK_RECIPIENT = "contact@fouzi-dev.fr";
+
+async function handleFeedback(request, env) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
+  const body = await request.json();
+  const type = String(body.type || "").trim();
+  const message = String(body.message || "").trim();
+  const email = String(body.email || "").trim();
+
+  if (!FEEDBACK_TYPES.has(type)) {
+    return jsonResponse({ error: "Type invalide" }, 400);
+  }
+  if (!message || message.length < 5) {
+    return jsonResponse({ error: "Message trop court" }, 400);
+  }
+  if (message.length > 5000) {
+    return jsonResponse({ error: "Message trop long" }, 400);
+  }
+
+  const subject =
+    type === "bug"
+      ? `[Bug Report] ShotNotif`
+      : `[Feature Request] ShotNotif`;
+
+  const text = [
+    `Type: ${type}`,
+    `Email: ${email || "non renseigné"}`,
+    "",
+    message,
+  ].join("\n");
+
+  const resendKey = env.RESEND_API_KEY;
+  if (!resendKey) {
+    console.error(`[${VERSION}] RESEND_API_KEY not configured`);
+    return jsonResponse({ error: "Service indisponible" }, 503);
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: FEEDBACK_SENDER,
+      to: [FEEDBACK_RECIPIENT],
+      subject,
+      text,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error(`[${VERSION}] Resend error (${res.status}): ${err}`);
+    return jsonResponse({ error: "Envoi échoué" }, 502);
+  }
+
+  return jsonResponse({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -1001,6 +1070,16 @@ export default {
     // Health check
     if (url.pathname === "/" || url.pathname === "/health") {
       return jsonResponse({ ok: true, version: VERSION });
+    }
+
+    // Feedback (needs env, not db)
+    if (url.pathname === "/api/feedback" && request.method === "POST") {
+      try {
+        return await handleFeedback(request, env);
+      } catch (error) {
+        console.error(`[${VERSION}] Feedback error:`, error);
+        return jsonResponse({ error: "Erreur interne" }, 500);
+      }
     }
 
     const route = matchRoute(request.method, url.pathname);

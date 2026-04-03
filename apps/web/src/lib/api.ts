@@ -150,3 +150,18 @@ export async function apiUpdateTemplate(data: {
 export async function apiDeleteAccount(): Promise<{ ok: boolean }> {
   return apiFetch("/api/account", { method: "DELETE" });
 }
+
+// ---------------------------------------------------------------------------
+// Feedback
+// ---------------------------------------------------------------------------
+
+export async function apiFeedback(data: {
+  type: "bug" | "feature";
+  message: string;
+  email?: string;
+}): Promise<{ ok: boolean }> {
+  return apiFetch("/api/feedback", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
