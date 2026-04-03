@@ -36,10 +36,13 @@ export async function POST(request: Request) {
         "getUpdates?limit=100&timeout=0"
       );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Impossible de lire Telegram.";
+      console.error("[discover] getUpdates failed:", error);
 
-      if (message.toLowerCase().includes("webhook")) {
+      const isWebhook =
+        error instanceof Error &&
+        error.message.toLowerCase().includes("webhook");
+
+      if (isWebhook) {
         return NextResponse.json(
           {
             error:
@@ -99,11 +102,10 @@ export async function POST(request: Request) {
       chats,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Impossible de contacter Telegram.";
+    console.error("[discover]", error);
 
     return NextResponse.json(
-      { error: message, errorKey: "contactFailed" },
+      { error: "Impossible de contacter Telegram.", errorKey: "contactFailed" },
       { status: 500 }
     );
   }

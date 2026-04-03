@@ -675,6 +675,7 @@ export function DashboardPageClient() {
     } catch {
       setTelegramSendAsChat(prev);
       saveStoredTelegramConfig(token, chatId, { sendAsChat: prev });
+      setTelegramChatValidationError(t("dashboard.errSaveConfig"));
     } finally {
       setSendAsChatSaving(false);
     }
@@ -695,6 +696,7 @@ export function DashboardPageClient() {
     } catch {
       setCheckInterval(prev);
       saveStoredTelegramConfig(token, chatId, { checkInterval: prev });
+      setTelegramChatValidationError(t("dashboard.errSaveConfig"));
     } finally {
       setCheckIntervalSaving(false);
     }

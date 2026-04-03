@@ -61,11 +61,10 @@ export async function POST(request: Request) {
       chat,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Impossible de valider ce chat Telegram.";
+    console.error("[validate-chat]", error);
 
     return NextResponse.json(
-      { error: message, errorKey: "validateGeneric" },
+      { error: "Impossible de valider ce chat Telegram.", errorKey: "validateGeneric" },
       { status: 500 }
     );
   }
