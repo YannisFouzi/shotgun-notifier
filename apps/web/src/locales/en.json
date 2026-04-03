@@ -81,6 +81,7 @@
     "errVerifyBot": "Could not verify this Telegram bot.",
     "errContactTelegram": "Could not reach Telegram.",
     "errValidateChat": "Could not validate this Telegram chat.",
+    "errSaveConfig": "Saved locally but server sync failed. Please try again.",
     "feedbackTitle": "Found a bug? Have an idea?",
     "feedbackSubtitle": "Help us improve ShotNotif.",
     "feedbackTypeBug": "Bug",

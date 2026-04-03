@@ -520,15 +520,18 @@ export function DashboardPageClient() {
       });
 
       // Push to Worker API so the cron uses these credentials
-      apiUpdateConfig({
-        telegramToken: normalizedToken,
-        telegramChatId: payload.chat.id,
-        telegramChatTitle: payload.chat.title,
-        telegramChatType: payload.chat.type,
-        telegramSendAsChat: sendAsChatPref,
-      }).catch(() => {
-        // API save failed silently — will retry on next save
-      });
+      try {
+        await apiUpdateConfig({
+          telegramToken: normalizedToken,
+          telegramChatId: payload.chat.id,
+          telegramChatTitle: payload.chat.title,
+          telegramChatType: payload.chat.type,
+          telegramSendAsChat: sendAsChatPref,
+        });
+      } catch {
+        setTelegramChatValidationError(t("dashboard.errSaveConfig"));
+        return;
+      }
 
       setTelegramChatId(payload.chat.id);
       setTelegramValidatedChat(payload.chat);

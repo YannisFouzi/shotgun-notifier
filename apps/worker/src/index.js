@@ -22,6 +22,15 @@ const SYNC_MAX_PAGES_PER_RUN = 10;
 const CHECK_INTERVAL_OPTIONS = new Set([1, 5, 10, 60, 300, 720, 1440, 10080]);
 const DEFAULT_CHECK_INTERVAL = 1;
 
+// Rate limit: { max requests, window in seconds }
+const RATE_LIMITS = {
+  "/api/auth":     { max: 10, window: 60 },
+  "/api/feedback": { max: 3,  window: 60 },
+};
+const RATE_LIMIT_CLEANUP_PROBABILITY = 0.05; // 5% chance per request
+
+const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -35,28 +44,122 @@ function isCountedStatus(status) {
   return COUNTED_STATUSES.has(String(status || "").trim().toLowerCase());
 }
 
+const DEFAULT_ALLOWED_ORIGINS = "https://shotnotif.vercel.app";
+
+function parseAllowedOrigins(env) {
+  const raw = env?.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS;
+  return new Set(raw.split(",").map((o) => o.trim()).filter(Boolean));
+}
+
+function matchOrigin(origins, requestOrigin) {
+  return requestOrigin && origins.has(requestOrigin) ? requestOrigin : null;
+}
+
+function corsHeaders(origin) {
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  };
+}
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
   });
 }
 
-function corsPreflightResponse() {
+function withCors(response, origin) {
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function getClientIp(request) {
+  return request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "unknown";
+}
+
+async function checkRateLimit(db, ip, endpoint) {
+  const config = RATE_LIMITS[endpoint];
+  if (!config) return null; // no limit configured
+
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = now - (now % config.window);
+  const key = `${ip}:${endpoint}:${windowStart}`;
+
+  const row = await db
+    .prepare("SELECT count FROM rate_limits WHERE key = ?")
+    .bind(key)
+    .first();
+
+  const currentCount = row ? toInt(row.count) : 0;
+
+  if (currentCount >= config.max) {
+    const retryAfter = windowStart + config.window - now;
+    return retryAfter > 0 ? retryAfter : 1;
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO rate_limits (key, count, window_start) VALUES (?, 1, ?)
+       ON CONFLICT (key) DO UPDATE SET count = count + 1`
+    )
+    .bind(key, windowStart)
+    .run();
+
+  // Probabilistic cleanup of expired entries
+  if (Math.random() < RATE_LIMIT_CLEANUP_PROBABILITY) {
+    await db
+      .prepare("DELETE FROM rate_limits WHERE window_start < ?")
+      .bind(windowStart - config.window)
+      .run();
+  }
+
+  return null; // allowed
+}
+
+function rateLimitResponse(retryAfter) {
+  return new Response(
+    JSON.stringify({ error: "Too many requests" }),
+    {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfter),
+      },
+    }
+  );
+}
+
+function corsPreflightResponse(origin) {
   return new Response(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      ...corsHeaders(origin),
       "Access-Control-Max-Age": "86400",
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Fetch with timeout
+// ---------------------------------------------------------------------------
+
+function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +189,7 @@ async function validateShotgunToken(token) {
   if (!organizerId) return null;
 
   const url = `${SHOTGUN_EVENTS_URL}/${organizerId}/events?key=${token.trim()}`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
 
   if (res.status === 401 || res.status === 403 || !res.ok) return null;
   return organizerId;
@@ -128,7 +231,7 @@ function shotgunHeaders(token) {
 }
 
 async function fetchJson(url, headers, label) {
-  const response = await fetch(url, { headers });
+  const response = await fetchWithTimeout(url, { headers });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`${label} failed (${response.status}): ${body}`);
@@ -309,7 +412,7 @@ async function sendTelegram(telegramToken, chatId, text, options) {
   }
 
   const url = `${TELEGRAM_API_BASE}/bot${telegramToken}/sendMessage`;
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -935,11 +1038,11 @@ async function handleTelegramTest(request, db) {
   try {
     await sendTelegram(tgToken, tgChatId, text, { sendAsChat });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[${VERSION}] Telegram test error:`, error instanceof Error ? error.message : error);
     return jsonResponse(
       {
         ok: false,
-        error: msg,
+        error: "Telegram send failed",
         sendAsChatAttempted: sendAsChat,
       },
       502
@@ -977,13 +1080,21 @@ async function handleFeedback(request, env) {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Corps de requête invalide" }, 400);
+  }
   const type = String(body.type || "").trim();
   const message = String(body.message || "").trim();
   const email = String(body.email || "").trim();
 
   if (!FEEDBACK_TYPES.has(type)) {
     return jsonResponse({ error: "Type invalide" }, 400);
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return jsonResponse({ error: "Email invalide" }, 400);
   }
   if (!message || message.length < 5) {
     return jsonResponse({ error: "Message trop court" }, 400);
@@ -1010,7 +1121,7 @@ async function handleFeedback(request, env) {
     return jsonResponse({ error: "Service indisponible" }, 503);
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetchWithTimeout("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${resendKey}`,
@@ -1061,44 +1172,63 @@ export default {
   },
 
   async fetch(request, env) {
+    const allowedOrigins = parseAllowedOrigins(env);
+    const requestOrigin = request.headers.get("Origin") || "";
+    const corsOrigin = matchOrigin(allowedOrigins, requestOrigin);
+
+    // Preflight
     if (request.method === "OPTIONS") {
-      return corsPreflightResponse();
+      if (requestOrigin && !corsOrigin) {
+        return new Response(null, { status: 403 });
+      }
+      return corsPreflightResponse(corsOrigin);
     }
 
     const url = new URL(request.url);
 
-    // Health check
+    // Health check (no CORS — useful for uptime monitoring)
     if (url.pathname === "/" || url.pathname === "/health") {
       return jsonResponse({ ok: true, version: VERSION });
     }
 
-    // Feedback (needs env, not db)
-    if (url.pathname === "/api/feedback" && request.method === "POST") {
-      try {
-        return await handleFeedback(request, env);
-      } catch (error) {
-        console.error(`[${VERSION}] Feedback error:`, error);
-        return jsonResponse({ error: "Erreur interne" }, 500);
+    // Block cross-origin API requests from unauthorized origins
+    if (requestOrigin && !corsOrigin) {
+      return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Rate limiting on sensitive endpoints
+    if (RATE_LIMITS[url.pathname]) {
+      const ip = getClientIp(request);
+      const retryAfter = await checkRateLimit(env.DB, ip, url.pathname);
+      if (retryAfter !== null) {
+        return withCors(rateLimitResponse(retryAfter), corsOrigin);
       }
     }
 
-    const route = matchRoute(request.method, url.pathname);
-
-    if (!route) {
-      return jsonResponse({ error: "Not found" }, 404);
-    }
-
+    // All API responses get CORS headers for the allowed origin
     try {
-      return await route.handler(request, env.DB);
+      let response;
+
+      // Feedback (needs env, not db)
+      if (url.pathname === "/api/feedback" && request.method === "POST") {
+        response = await handleFeedback(request, env);
+      } else {
+        const route = matchRoute(request.method, url.pathname);
+        if (!route) {
+          return withCors(jsonResponse({ error: "Not found" }, 404), corsOrigin);
+        }
+        response = await route.handler(request, env.DB);
+      }
+
+      return withCors(response, corsOrigin);
     } catch (error) {
       console.error(`[${VERSION}] API error:`, error);
-      return jsonResponse(
-        {
-          error: "Erreur interne",
-          details:
-            error instanceof Error ? error.message : String(error),
-        },
-        500
+      return withCors(
+        jsonResponse({ error: "Erreur interne" }, 500),
+        corsOrigin
       );
     }
   },

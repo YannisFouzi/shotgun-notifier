@@ -81,6 +81,7 @@
     "errVerifyBot": "Impossible de vérifier ce bot Telegram.",
     "errContactTelegram": "Impossible de contacter Telegram.",
     "errValidateChat": "Impossible de valider ce chat Telegram.",
+    "errSaveConfig": "Configuration sauvegardée localement mais la synchronisation serveur a échoué. Réessayez.",
     "feedbackTitle": "Un bug ? Une idée ?",
     "feedbackSubtitle": "Aidez-nous à améliorer ShotNotif.",
     "feedbackTypeBug": "Bug",
