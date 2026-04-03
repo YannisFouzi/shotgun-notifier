@@ -4,7 +4,9 @@
   "packageManager": "npm@10.9.2",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "build": "turbo run build"
+    "build": "turbo run build",
+    "promo:dev": "npm run dev -w @shotgun-notifier/promo-video",
+    "promo:render": "npm run render -w @shotgun-notifier/promo-video"
   },
   "devDependencies": {
     "turbo": "^2.7.4"

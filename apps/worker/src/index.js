@@ -380,7 +380,7 @@ function renderNotificationMessage(organizer, notificationData, showEventName) {
 
   // Fallback: if the template renders empty, use a basic format
   if (!rendered.trim()) {
-    const lines = ["Nouvelle vente ShotNotif"];
+    const lines = ["Nouvelle vente"];
     if (showEventName) lines.push(data.event_name);
     lines.push(`${data.new_tickets_label} : ${data.event_total_sold}`);
     if (data.deal_lines) lines.push(data.deal_lines);

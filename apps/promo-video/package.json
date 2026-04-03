@@ -1,0 +1,25 @@
+{
+  "name": "@shotgun-notifier/promo-video",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Vidéo de présentation ShotNotif (Remotion)",
+  "scripts": {
+    "dev": "remotion studio src/index.tsx",
+    "render": "remotion render src/index.tsx ShotNotifPromo out/shotnotif-promo.mp4",
+    "still": "remotion still src/index.tsx ShotNotifPromo out/poster.png --frame=420"
+  },
+  "dependencies": {
+    "@remotion/tailwind": "^4.0.441",
+    "lucide-react": "^1.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.441",
+    "tailwindcss": "^3.4.19",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.441",
+    "@types/react": "^18.3.12",
+    "typescript": "^5.6.3"
+  }
+}

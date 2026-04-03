@@ -26,9 +26,9 @@
     "submit": "Se connecter"
   },
   "preview": {
-    "carousel0": "Nouvelle vente ShotNotif\n1 billet vendu : 57\nVAGUE 2 : 4/200\n16,50 EUR",
-    "carousel1": "Nouvelle vente ShotNotif\n3 billets vendus : 60\nEARLY BIRD : 48/100\nVAGUE 1 : 12/300\n49,50 EUR",
-    "carousel2": "Nouvelle vente ShotNotif\n2 billets vendus : 100\nEARLY BIRD : 100/100 SOLD OUT\nPaiement : card",
+    "carousel0": "Nouvelle vente\n1 billet vendu : 57\nVAGUE 2 : 4/200\n16,50 EUR",
+    "carousel1": "Nouvelle vente\n3 billets vendus : 60\nEARLY BIRD : 48/100\nVAGUE 1 : 12/300\n49,50 EUR",
+    "carousel2": "Nouvelle vente\n2 billets vendus : 100\nEARLY BIRD : 100/100 SOLD OUT\nPaiement : card",
     "carousel3": "KODZ X GUETTAPEN X MERCI LILLE\n1 mai 2026 - 21:00\n1 billet vendu : 57\nVAGUE 2 : 4/200"
   },
   "dashboard": {
@@ -162,7 +162,7 @@
     "userLucas": "Lucas",
     "userMarie": "Marie",
     "msgLucas": "On en est où des ventes ?",
-    "msgMarie": "Le bot va nous dire ça",
+    "msgMarie": "ShotNotif va nous dire ça",
     "senderBot": "ShotNotif",
     "emptyMessage": "Votre message apparaîtra ici.",
     "composerPlaceholder": "Message"

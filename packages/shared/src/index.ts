@@ -1,5 +1,11 @@
 export { VERSION } from "./version";
 export {
+  TelegramPhoneMockup,
+  formatTelegramDayLabel,
+  type TelegramPhoneMockupProps,
+  type TelegramPhoneMockupMessage,
+} from "./telegram-phone-mockup";
+export {
   type MessageTemplateSection,
   type MessageTemplateSectionMeta,
   type MessageTemplateVariable,

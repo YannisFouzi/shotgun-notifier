@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { formatTelegramDayLabel } from "@shotgun-notifier/shared";
 import {
   AtSign,
   Bell,
@@ -53,6 +54,9 @@ export function DiscordPreview({ message, mode = "bot" }: DiscordPreviewProps) {
   const prevTime = getPreviousTime(localeTag);
   const isGroup = mode === "group";
   const channelName = isGroup ? "orga-events" : "notifications";
+  const dayLabel = formatTelegramDayLabel(
+    i18n.resolvedLanguage || i18n.language || "en"
+  );
 
   return (
     <div className="mx-auto flex h-[42rem] w-full max-w-[23rem] flex-col overflow-hidden rounded-[2.2rem] border border-[#1e1f22] bg-[#313338] shadow-[0_28px_60px_rgba(0,0,0,0.38)]">
@@ -77,7 +81,7 @@ export function DiscordPreview({ message, mode = "bot" }: DiscordPreviewProps) {
         <div className="mb-4 flex items-center gap-2">
           <div className="h-px flex-1 bg-[#3f4147]" />
           <span className="text-[11px] font-semibold text-[#80848e]">
-            {t("telegramPreview.today")}
+            {dayLabel}
           </span>
           <div className="h-px flex-1 bg-[#3f4147]" />
         </div>
