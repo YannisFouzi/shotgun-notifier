@@ -7,7 +7,7 @@ import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
-const SITE_URL = "https://shotnotif.vercel.app";
+const SITE_URL = "https://shotnotif.com";
 const SITE_NAME = "ShotNotif";
 const SITE_DESCRIPTION =
   "Real-time Telegram notifications for every Shotgun.live ticket sale. Set up in seconds.";

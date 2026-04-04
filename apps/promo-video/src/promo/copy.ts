@@ -96,7 +96,7 @@ export const COPY = {
   outro: {
     tagline: "Chaque vente.",
     accent: "Sur Telegram.",
-    url: "shotnotif.vercel.app",
+    url: "shotnotif.com",
     tags: ["Temps réel", "Personnalisable", "Gratuit"],
   },
 } as const;

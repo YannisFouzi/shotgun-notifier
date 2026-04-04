@@ -68,8 +68,10 @@ describe("isCountedStatus", () => {
 describe("parseAllowedOrigins", () => {
   it("uses default when no env", () => {
     const origins = parseAllowedOrigins({});
+    expect(origins.has("https://shotnotif.com")).toBe(true);
+    expect(origins.has("https://www.shotnotif.com")).toBe(true);
     expect(origins.has("https://shotnotif.vercel.app")).toBe(true);
-    expect(origins.size).toBe(1);
+    expect(origins.size).toBe(3);
   });
 
   it("parses comma-separated origins", () => {

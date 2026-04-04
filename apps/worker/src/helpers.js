@@ -5,7 +5,7 @@
 const COUNTED_STATUSES = new Set(["valid", "resold"]);
 const CHECK_INTERVAL_OPTIONS = new Set([1, 5, 10, 60, 300, 720, 1440, 10080]);
 const DEFAULT_CHECK_INTERVAL = 1;
-const DEFAULT_ALLOWED_ORIGINS = "https://shotnotif.vercel.app";
+const DEFAULT_ALLOWED_ORIGINS = "https://shotnotif.com,https://www.shotnotif.com,https://shotnotif.vercel.app";
 
 export function toInt(value) {
   const parsed = Number(value);
