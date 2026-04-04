@@ -155,6 +155,36 @@ export async function apiDeleteAccount(): Promise<{ ok: boolean }> {
 // Feedback
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+
+interface AdminStatsResponse {
+  ok: boolean;
+  stats: {
+    totalOrganizers: number;
+    activeOrganizers: number;
+    totalEvents: number;
+    totalTickets: number;
+  };
+  recentOrganizers: Array<{
+    id: number;
+    telegram_chat_title: string | null;
+    is_active: number;
+    check_interval: number | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
+export async function apiAdminStats(): Promise<AdminStatsResponse> {
+  return apiFetch<AdminStatsResponse>("/api/admin/stats");
+}
+
+// ---------------------------------------------------------------------------
+// Feedback
+// ---------------------------------------------------------------------------
+
 export async function apiFeedback(data: {
   type: "bug" | "feature";
   message: string;

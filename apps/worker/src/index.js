@@ -1048,6 +1048,55 @@ async function handleFeedback(request, env) {
 }
 
 // ---------------------------------------------------------------------------
+// Admin stats (restricted to ADMIN_ORG_ID)
+// ---------------------------------------------------------------------------
+
+const ADMIN_ORG_ID = "183206";
+
+async function handleAdminStats(request, db) {
+  const organizer = await authenticate(request, db);
+  if (!organizer) return jsonResponse({ error: "Non autorise" }, 401);
+  if (String(organizer.id) !== ADMIN_ORG_ID) {
+    return jsonResponse({ error: "Forbidden" }, 403);
+  }
+
+  const totalOrganizers = await db
+    .prepare("SELECT COUNT(*) as count FROM organizers")
+    .first();
+
+  const activeOrganizers = await db
+    .prepare(
+      "SELECT COUNT(*) as count FROM organizers WHERE is_active = 1 AND telegram_token IS NOT NULL AND telegram_chat_id IS NOT NULL"
+    )
+    .first();
+
+  const totalEvents = await db
+    .prepare("SELECT COUNT(*) as count FROM event_counts")
+    .first();
+
+  const totalTickets = await db
+    .prepare("SELECT COALESCE(SUM(count), 0) as count FROM deal_counts")
+    .first();
+
+  const recentOrganizers = await db
+    .prepare(
+      "SELECT id, telegram_chat_title, is_active, check_interval, created_at, updated_at FROM organizers ORDER BY created_at DESC LIMIT 10"
+    )
+    .all();
+
+  return jsonResponse({
+    ok: true,
+    stats: {
+      totalOrganizers: totalOrganizers.count,
+      activeOrganizers: activeOrganizers.count,
+      totalEvents: totalEvents.count,
+      totalTickets: totalTickets.count,
+    },
+    recentOrganizers: recentOrganizers.results,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -1060,6 +1109,7 @@ function matchRoute(method, pathname) {
     { method: "GET", path: "/api/template", handler: handleGetTemplate },
     { method: "PUT", path: "/api/template", handler: handleUpdateTemplate },
     { method: "DELETE", path: "/api/account", handler: handleDeleteAccount },
+    { method: "GET", path: "/api/admin/stats", handler: handleAdminStats },
   ];
 
   return routes.find((r) => r.method === method && r.path === pathname);

@@ -21,6 +21,7 @@ import { MessageTemplateEditor } from "@/components/message-template-editor";
 import { ChannelSetupGuide } from "@/components/channel-setup-guide";
 import { DeleteAccountSection } from "@/components/delete-account-dialog";
 import { FeedbackSection } from "@/components/feedback-section";
+import { AdminUserCount, useIsAdmin } from "@/components/admin-panel";
 import { SiteFooter } from "@/components/site-footer";
 import { LanguageToggle } from "@/components/language-toggle";
 import { Input } from "@/components/ui/input";
@@ -165,6 +166,7 @@ function chatRowSubtitle(chat: TelegramDetectedChat, t: TFunction) {
 export function DashboardPageClient() {
   const { t } = useTranslation();
   const router = useRouter();
+  const isAdmin = useIsAdmin();
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
   const [telegramLookupLoading, setTelegramLookupLoading] = useState(false);
@@ -853,6 +855,7 @@ export function DashboardPageClient() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-4">
           <h1 className="text-lg font-semibold">{t("dashboard.title")}</h1>
           <div className="flex items-center gap-2">
+            {isAdmin && <AdminUserCount />}
             <LanguageToggle />
             <Button
               variant="ghost"
