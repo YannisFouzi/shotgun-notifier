@@ -30,7 +30,7 @@ export const SCENE = {
   outro: 132,
 } as const;
 
-export const DEMO_SCENE_FRAMES = 296;
+export const DEMO_SCENE_FRAMES = 304;
 export const DEMO_EDITOR_TRANSITION_FRAMES = 24;
 export const EDITOR_OUTRO_TRANSITION_FRAMES = 20;
 

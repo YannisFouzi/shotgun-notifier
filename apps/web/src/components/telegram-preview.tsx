@@ -2,8 +2,10 @@
 
 import { useTranslation } from "react-i18next";
 import {
-  formatTelegramDayLabel,
-  TelegramPhoneMockup,
+  IPhoneMockup,
+  IOSLockScreen,
+  TelegramNotifIcon,
+  type IOSNotification,
 } from "@shotgun-notifier/shared";
 
 interface TelegramPreviewProps {
@@ -15,75 +17,54 @@ function timeLocaleTag(lng: string) {
   return lng.startsWith("fr") ? "fr-FR" : "en-GB";
 }
 
-function getPreviewTime(localeTag: string) {
+function getFormattedTime(localeTag: string) {
   return new Intl.DateTimeFormat(localeTag, {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date());
 }
 
-function getPreviousTime(localeTag: string) {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - 8);
+function getFormattedDate(localeTag: string) {
   return new Intl.DateTimeFormat(localeTag, {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
 }
 
-export function TelegramPreview({ message, mode = "bot" }: TelegramPreviewProps) {
+export function TelegramPreview({
+  message,
+  mode = "bot",
+}: TelegramPreviewProps) {
   const { t, i18n } = useTranslation();
-  const localeTag = timeLocaleTag(i18n.resolvedLanguage || i18n.language || "en");
-  const renderedMessage = message || t("telegramPreview.emptyMessage");
-  const previewTime = getPreviewTime(localeTag);
-  const prevTime = getPreviousTime(localeTag);
-  const isGroup = mode === "group";
-  const dayLabel = formatTelegramDayLabel(
+  const localeTag = timeLocaleTag(
     i18n.resolvedLanguage || i18n.language || "en"
   );
+  const renderedMessage = message || t("telegramPreview.emptyMessage");
+  const isGroup = mode === "group";
+
+  const title = isGroup
+    ? t("telegramPreview.groupTitle")
+    : t("telegramPreview.botTitle");
+
+  const notifications: IOSNotification[] = [
+    {
+      icon: <TelegramNotifIcon size={28} />,
+      appName: "Telegram",
+      title,
+      body: renderedMessage,
+      time: t("telegramPreview.now", { defaultValue: "now" }),
+    },
+  ];
+
 
   return (
-    <TelegramPhoneMockup
-      width="100%"
-      maxWidth="23rem"
-      title={isGroup ? t("telegramPreview.groupTitle") : t("telegramPreview.botTitle")}
-      subtitle={
-        isGroup
-          ? t("telegramPreview.groupMembers", { count: 3 })
-          : t("telegramPreview.botSubtitle")
-      }
-      avatarLabel={
-        isGroup
-          ? t("telegramPreview.groupInitials")
-          : t("telegramPreview.botInitials")
-      }
-      avatarBackground={isGroup ? "#3e546a" : "#2AABEE"}
-      dayLabel={dayLabel}
-      composerPlaceholder={t("telegramPreview.composerPlaceholder")}
-      alignMessagesToBottom
-      messages={[
-        ...(isGroup
-          ? [
-              {
-                content: t("telegramPreview.msgLucas"),
-                time: prevTime,
-                sender: t("telegramPreview.userLucas"),
-                senderColor: "#e67e22",
-              },
-              {
-                content: t("telegramPreview.msgMarie"),
-                time: prevTime,
-                side: "right" as const,
-              },
-            ]
-          : []),
-        {
-          content: renderedMessage,
-          time: previewTime,
-          sender: t("telegramPreview.senderBot"),
-          senderColor: "#2AABEE",
-        },
-      ]}
-    />
+    <IPhoneMockup scale={0.85} variant="black">
+      <IOSLockScreen
+        time={getFormattedTime(localeTag)}
+        date={getFormattedDate(localeTag)}
+        notifications={notifications}
+      />
+    </IPhoneMockup>
   );
 }

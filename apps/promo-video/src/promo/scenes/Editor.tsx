@@ -4,10 +4,9 @@ import { COLORS, FONT_DISPLAY } from "../constants";
 import { COPY } from "../copy";
 import { getEditorLineProgress } from "../editor-timing";
 import { EditorPanel } from "../mockups/EditorPanel";
-import { TelegramMessageMockup } from "../mockups/TelegramMessageMockup";
+import { IPhoneLockScreenCropped } from "../mockups/IPhoneLockScreenMockup";
 import { FadeUp, SceneBg, SceneFrame } from "../ui";
 
-const PREVIEW_MESSAGE_TIME = "14:33";
 
 interface EditorProps {
   showBackground?: boolean;
@@ -15,62 +14,21 @@ interface EditorProps {
   contentStyle?: CSSProperties;
 }
 
-function buildEditorPreviewMessage(frame: number, fps: number) {
-  const rows = COPY.editor.templateRows
-    .map((row, rowIndex) => {
-      const rowProgress = Math.max(
-        ...row.map((line) => getEditorLineProgress(frame, fps, line.delay))
-      );
-
-      if (rowProgress <= 0.001) {
-        return null;
-      }
-
-      const segments = row.map((line, itemIndex) => {
-        const progress = getEditorLineProgress(frame, fps, line.delay);
-        const content =
-          line.type === "text" ? line.text : COPY.editor.previewContext[line.key];
-
-        return (
-          <span
-            key={`${rowIndex}-${itemIndex}`}
-            style={{
-              opacity: progress,
-              display: "inline",
-              whiteSpace: line.type === "text" ? "pre-wrap" : "normal",
-            }}
-          >
-            {content}
-          </span>
-        );
-      });
-
-      return (
-        <div
-          key={`row-${rowIndex}`}
-          style={{
-            marginBottom: rowIndex === COPY.editor.templateRows.length - 1 ? 0 : 2,
-            lineHeight: 1.28,
-          }}
-        >
-          {segments}
-        </div>
-      );
-    })
-    .filter((row): row is JSX.Element => row !== null);
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 0,
-        lineHeight: 1.22,
-      }}
-    >
-      {rows}
-    </div>
-  );
+function buildEditorPreviewText(frame: number, fps: number): string {
+  const parts: string[] = [];
+  for (const row of COPY.editor.templateRows) {
+    const rowProgress = Math.max(
+      ...row.map((line) => getEditorLineProgress(frame, fps, line.delay))
+    );
+    if (rowProgress <= 0.001) continue;
+    const rowText = row
+      .map((line) =>
+        line.type === "text" ? line.text : COPY.editor.previewContext[line.key]
+      )
+      .join("");
+    parts.push(rowText);
+  }
+  return parts.join("\n");
 }
 
 export function Editor({
@@ -80,7 +38,7 @@ export function Editor({
 }: EditorProps = {}) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const previewMsg = buildEditorPreviewMessage(frame, fps);
+  const previewText = buildEditorPreviewText(frame, fps);
   const previewProgress = getEditorLineProgress(
     frame,
     fps,
@@ -131,9 +89,8 @@ export function Editor({
             <EditorPanel />
           </FadeUp>
 
-          <TelegramMessageMockup
-            message={previewMsg}
-            time={PREVIEW_MESSAGE_TIME}
+          <IPhoneLockScreenCropped
+            message={previewText}
             phoneProgress={phoneProgress}
             progress={previewProgress}
           />

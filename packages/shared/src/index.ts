@@ -5,6 +5,13 @@ export {
   type TelegramPhoneMockupProps,
   type TelegramPhoneMockupMessage,
 } from "./telegram-phone-mockup";
+export { IPhoneMockup, type IPhoneMockupProps } from "./iphone-mockup";
+export {
+  IOSLockScreen,
+  TelegramNotifIcon,
+  type IOSLockScreenProps,
+  type IOSNotification,
+} from "./ios-lock-screen";
 export {
   type MessageTemplateSection,
   type MessageTemplateSectionMeta,

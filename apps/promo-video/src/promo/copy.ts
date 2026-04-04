@@ -1,4 +1,4 @@
-import type { TelegramMessage } from "./mockups/TelegramPreviewDashboard";
+import type { LockScreenMessage } from "./mockups/IPhoneLockScreenMockup";
 
 export const COPY = {
   demo: {
@@ -8,20 +8,20 @@ export const COPY = {
     messages: [
       {
         text: "Nouvelle vente\n1 billet vendu : 55\nVAGUE 2 : 5/200",
-        time: "14:30",
+        time: "3 min",
         delay: 18,
       },
       {
         text: "Nouvelle vente\n3 billets vendus : 58\nVAGUE 2 : 8/200",
-        time: "14:31",
+        time: "2 min",
         delay: 66,
       },
       {
         text: "Nouvelle vente\n2 billets vendus : 60\nVAGUE 2 : 10/200",
-        time: "14:32",
+        time: "now",
         delay: 114,
       },
-    ] satisfies TelegramMessage[],
+    ] satisfies LockScreenMessage[],
   },
 
   editor: {

@@ -110,7 +110,7 @@ function ChatHeader() {
         OE
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 21, fontWeight: 600, color: "white", lineHeight: 1.2 }}>Orga Events</div>
+        <div style={{ fontSize: 21, fontWeight: 600, color: "white", lineHeight: 1.2 }}>Orga Shotnotif</div>
         <div style={{ fontSize: 17, color: TG.accent }}>3 membres</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 3 }}>

@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { COLORS, COMPOSITION, FONT_DISPLAY } from "../constants";
 import { COPY } from "../copy";
-import { TelegramPreviewDashboard } from "../mockups/TelegramPreviewDashboard";
+import { IPhoneLockScreenMockup } from "../mockups/IPhoneLockScreenMockup";
 import { FadeUp, SceneBg, SceneFrame } from "../ui";
 
 interface DemoProps {
@@ -130,10 +130,12 @@ export function Demo({
             minHeight: 0,
           }}
         >
-          <TelegramPreviewDashboard
+          <IPhoneLockScreenMockup
             messages={COPY.demo.messages}
             width={700}
             delay={titleHoldFrames + 4}
+            time="14:30"
+            date="Samedi 5 avril"
           />
         </div>
       </SceneFrame>

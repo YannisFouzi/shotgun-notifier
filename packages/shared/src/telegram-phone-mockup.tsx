@@ -8,6 +8,7 @@ import {
   Search,
   Smile,
 } from "lucide-react";
+import { IPhoneMockup } from "./iphone-mockup";
 
 export interface TelegramPhoneMockupMessage {
   content: ReactNode;
@@ -131,67 +132,25 @@ export function TelegramPhoneMockup({
   const resolvedActionIconColor = actionIconColor ?? accentColor;
   const resolvedSubtitleColor = subtitleColor ?? accentColor;
   const numericWidth = typeof width === "number" ? width : null;
-  const phoneScale = numericWidth ? numericWidth / BASE_PHONE_WIDTH : 1;
-  const resolvedHeight =
-    numericWidth !== null ? BASE_PHONE_HEIGHT * phoneScale : undefined;
+  // IPhoneMockup native width is 428px
+  const iphoneScale = numericWidth ? numericWidth / 428 : BASE_PHONE_WIDTH / 428;
+  const resolvedHeight = numericWidth
+    ? 868 * iphoneScale
+    : BASE_PHONE_HEIGHT;
   const containerOpacity = Math.max(0, Math.min(1, progress));
 
-  const phoneCanvas = (
+  const telegramContent = (
     <div
       style={{
-        width: numericWidth !== null ? BASE_PHONE_WIDTH : "100%",
-        height: numericWidth !== null ? BASE_PHONE_HEIGHT : "100%",
-        transform:
-          numericWidth !== null ? `scale(${phoneScale})` : undefined,
-        transformOrigin: numericWidth !== null ? "top left" : undefined,
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: TG.headerBg,
+        color: TG.text,
+        fontFamily: "inherit",
       }}
     >
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          borderRadius: 56,
-          padding: 10,
-          background: "#080b10",
-          border: "2px solid rgba(255,255,255,0.08)",
-          boxShadow: deviceShadow,
-          boxSizing: "border-box",
-        }}
-      >
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            justifyContent: "center",
-            zIndex: 2,
-          }}
-        >
-          <div
-            style={{
-              width: 144,
-              height: 32,
-              background: "#080b10",
-              borderRadius: "0 0 18px 18px",
-              position: "absolute",
-              top: 0,
-            }}
-          />
-        </div>
-
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            borderRadius: 46,
-            overflow: "hidden",
-            border: "1px solid rgba(255,255,255,0.08)",
-            display: "flex",
-            flexDirection: "column",
-            background: TG.headerBg,
-            color: TG.text,
-            fontFamily: "inherit",
-          }}
-        >
           <div style={{ background: TG.headerBg, padding: "12px 16px 0", color: "#fff" }}>
             <div
               style={{
@@ -504,18 +463,15 @@ export function TelegramPhoneMockup({
               </div>
             </div>
           ) : null}
-        </div>
-      </div>
     </div>
   );
 
   return (
     <div
       style={{
-        width,
+        width: numericWidth ?? width,
         maxWidth,
         height: resolvedHeight,
-        aspectRatio: resolvedHeight ? undefined : "1 / 2.08",
         opacity: containerOpacity,
         transform: `translateY(${(1 - containerOpacity) * 44}px) scale(${0.97 + containerOpacity * 0.03})`,
         flexShrink: 0,
@@ -524,7 +480,9 @@ export function TelegramPhoneMockup({
         ...style,
       }}
     >
-      {phoneCanvas}
+      <IPhoneMockup scale={iphoneScale} variant="black">
+        {telegramContent}
+      </IPhoneMockup>
     </div>
   );
 }

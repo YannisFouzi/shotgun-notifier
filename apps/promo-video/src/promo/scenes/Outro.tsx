@@ -1,12 +1,16 @@
 import type { CSSProperties } from "react";
-import {
-  formatTelegramDayLabel,
-  TelegramPhoneMockup,
-} from "@shotgun-notifier/shared";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { COLORS, FONT_BODY } from "../constants";
 import { COPY } from "../copy";
+import type { LockScreenMessage } from "../mockups/IPhoneLockScreenMockup";
+import { IPhoneLockScreenMockup } from "../mockups/IPhoneLockScreenMockup";
 import { BrandTitle, FadeUp, SceneBg, SceneFrame } from "../ui";
+
+/** Same messages as Demo but with much shorter delays */
+const FAST_MESSAGES: LockScreenMessage[] = COPY.demo.messages.map((msg, i) => ({
+  ...msg,
+  delay: i * 16,
+}));
 
 interface OutroProps {
   showBackground?: boolean;
@@ -21,11 +25,13 @@ export function Outro({
 }: OutroProps = {}) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const dayLabel = formatTelegramDayLabel("fr");
+
   const phoneWidth = 700;
-  const phoneAspectRatio = 2.08;
-  const phoneVisibleHeight = phoneWidth * phoneAspectRatio;
-  const removePhoneAt = 75;
+  const deviceScale = phoneWidth / 428;
+  const phoneVisibleHeight = 868 * deviceScale;
+
+  // Phone disappears at frame 80 (≈ 22:10 in the video)
+  const removePhoneAt = 80;
   const hidePhoneProgress = spring({
     frame: frame - removePhoneAt,
     fps,
@@ -35,10 +41,7 @@ export function Outro({
     hidePhoneProgress,
     [0, 1],
     [phoneVisibleHeight, 0],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
   const phoneOpacity = interpolate(hidePhoneProgress, [0, 1], [1, 0], {
     extrapolateLeft: "clamp",
@@ -128,39 +131,13 @@ export function Outro({
                 transformOrigin: "center top",
               }}
             >
-              <FadeUp delay={10}>
-                <TelegramPhoneMockup
-                  width={phoneWidth}
-                  maxWidth={phoneWidth}
-                  title="Orga Events"
-                  subtitle="3 membres"
-                  avatarLabel="OE"
-                  avatarBackground="#3e546a"
-                  dayLabel={dayLabel}
-                  composerPlaceholder="Message"
-                  alignMessagesToBottom
-                  messages={[
-                    {
-                      content: "On en est ou des ventes ?",
-                      time: "12:57",
-                      sender: "Lucas",
-                      senderColor: "#e67e22",
-                    },
-                    {
-                      content: "ShotNotif va nous dire ca",
-                      time: "12:57",
-                      side: "right",
-                    },
-                    {
-                      content:
-                        "KODZ X GUETTAPEN X MERCI LILLE\n1 mai 2026 - 21:00\n1 billet vendu : 57\nVAGUE 2 : 4/200",
-                      time: "13:05",
-                      sender: "ShotNotif",
-                      senderColor: "#2AABEE",
-                    },
-                  ]}
-                />
-              </FadeUp>
+              <IPhoneLockScreenMockup
+                messages={FAST_MESSAGES}
+                width={700}
+                delay={10}
+                time="14:30"
+                date="Samedi 5 avril"
+              />
             </div>
           </div>
         </div>

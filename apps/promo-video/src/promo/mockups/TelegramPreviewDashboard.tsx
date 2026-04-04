@@ -53,9 +53,9 @@ export function TelegramPreviewDashboard({
       width={width}
       maxWidth={width}
       progress={progress}
-      title={isGroup ? "Orga Events" : "ShotNotif"}
+      title={isGroup ? "Orga Shotnotif" : "ShotNotif"}
       subtitle={isGroup ? "3 membres" : "bot"}
-      avatarLabel={isGroup ? "OE" : "SN"}
+      avatarLabel={isGroup ? "OS" : "SN"}
       avatarBackground={isGroup ? "#3e546a" : "#2AABEE"}
       dayLabel={dayLabel}
       composerPlaceholder="Message"
