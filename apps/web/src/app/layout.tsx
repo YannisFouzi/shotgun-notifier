@@ -6,9 +6,35 @@ import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
+const SITE_URL = "https://shotnotif.vercel.app";
+const SITE_NAME = "ShotNotif";
+const SITE_DESCRIPTION =
+  "Real-time Telegram notifications for every Shotgun.live ticket sale. Set up in seconds.";
+
 export const metadata: Metadata = {
-  title: "ShotNotif",
-  description: "Real-time sale notifications for Shotgun.live organizers",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_NAME,
+    template: `%s — ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

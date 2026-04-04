@@ -4,7 +4,7 @@ import { LegalPageView } from "@/components/legal-page-view";
 import { CGV_DOCUMENTS } from "@/lib/legal/cgv-content";
 
 export const metadata: Metadata = {
-  title: "CGV — ShotNotif",
+  title: "CGV",
   description: "Conditions générales de vente ShotNotif.",
 };
 

@@ -4,7 +4,7 @@ import { LegalPageView } from "@/components/legal-page-view";
 import { CGU_DOCUMENTS } from "@/lib/legal/cgu-content";
 
 export const metadata: Metadata = {
-  title: "CGU — ShotNotif",
+  title: "CGU",
   description: "Conditions générales d’utilisation du service ShotNotif.",
 };
 
