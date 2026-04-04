@@ -46,7 +46,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        <PlausibleProvider src="https://plausible.io/js/pa-Ku_vXATvA-B2g_CAxGSxo.js" />
+        <PlausibleProvider domain="shotnotif.com" src="https://plausible.io/js/pa-Ku_vXATvA-B2g_CAxGSxo.js" />
       </head>
       <body className={cn("font-sans antialiased", geist.variable)}>
         <Providers>{children}</Providers>
