@@ -5,6 +5,23 @@ import {
   DEFAULT_MESSAGE_TEMPLATE_CONTENT,
   DEFAULT_MESSAGE_TEMPLATE_SETTINGS,
 } from "@shotgun-notifier/shared";
+import {
+  toInt,
+  isCountedStatus,
+  parseAllowedOrigins,
+  matchOrigin,
+  getOrganizerIdFromToken,
+  makeCursor,
+  getEventName,
+  toTelegramIntegerChatId,
+  sqliteIntFlagIsOn,
+  organizerTargetSupportsSendAsChat,
+  buildTicketsUrl,
+  buildNotificationData,
+  isValidCheckInterval,
+  CHECK_INTERVAL_OPTIONS,
+  DEFAULT_CHECK_INTERVAL,
+} from "./helpers.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -16,12 +33,8 @@ const SHOTGUN_EVENTS_URL =
   "https://smartboard-api.shotgun.live/api/shotgun/organizers";
 const TELEGRAM_API_BASE = "https://api.telegram.org";
 
-const COUNTED_STATUSES = new Set(["valid", "resold"]);
 const BOOTSTRAP_MAX_PAGES = 200;
 const SYNC_MAX_PAGES_PER_RUN = 10;
-
-const CHECK_INTERVAL_OPTIONS = new Set([1, 5, 10, 60, 300, 720, 1440, 10080]);
-const DEFAULT_CHECK_INTERVAL = 1;
 
 // Rate limit: { max requests, window in seconds }
 const RATE_LIMITS = {
@@ -33,28 +46,8 @@ const RATE_LIMIT_CLEANUP_PROBABILITY = 0.05; // 5% chance per request
 const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers (HTTP / CORS)
 // ---------------------------------------------------------------------------
-
-function toInt(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isCountedStatus(status) {
-  return COUNTED_STATUSES.has(String(status || "").trim().toLowerCase());
-}
-
-const DEFAULT_ALLOWED_ORIGINS = "https://shotnotif.vercel.app";
-
-function parseAllowedOrigins(env) {
-  const raw = env?.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS;
-  return new Set(raw.split(",").map((o) => o.trim()).filter(Boolean));
-}
-
-function matchOrigin(origins, requestOrigin) {
-  return requestOrigin && origins.has(requestOrigin) ? requestOrigin : null;
-}
 
 function corsHeaders(origin) {
   return {
@@ -167,23 +160,6 @@ function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
 // Shotgun token helpers
 // ---------------------------------------------------------------------------
 
-function decodeBase64Url(value) {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-  return atob(padded);
-}
-
-function getOrganizerIdFromToken(token) {
-  const [, payload = ""] = token.trim().split(".");
-  if (!payload) return "";
-
-  try {
-    const parsed = JSON.parse(decodeBase64Url(payload));
-    return parsed.organizerId ? String(parsed.organizerId) : "";
-  } catch {
-    return "";
-  }
-}
 
 async function validateShotgunToken(token) {
   const organizerId = getOrganizerIdFromToken(token);
@@ -240,18 +216,6 @@ async function fetchJson(url, headers, label) {
   return response.json();
 }
 
-function buildTicketsUrl(organizerId, afterCursor, eventId) {
-  const url = new URL(SHOTGUN_TICKETS_URL);
-  url.searchParams.set("organizer_id", organizerId);
-  if (eventId) {
-    url.searchParams.set("event_id", eventId);
-    url.searchParams.set("include_cohosted_events", "1");
-  }
-  if (afterCursor) {
-    url.searchParams.set("after", afterCursor);
-  }
-  return url.toString();
-}
 
 async function fetchEvents(organizerId, shotgunToken) {
   const url = `${SHOTGUN_EVENTS_URL}/${organizerId}/events?key=${shotgunToken}`;
@@ -267,23 +231,6 @@ async function fetchEvents(organizerId, shotgunToken) {
   });
 }
 
-function makeCursor(ticket) {
-  const updatedAt = String(
-    ticket.ticket_updated_at || ticket.ordered_at || ""
-  ).trim();
-  const ticketId = String(ticket.ticket_id || "").trim();
-  if (!updatedAt || !ticketId) return "";
-  return `${updatedAt}_${ticketId}`;
-}
-
-function getEventName(ticket) {
-  return String(
-    ticket.event_name ||
-      ticket.event_title ||
-      ticket.event_slug ||
-      (ticket.event_id ? `Event #${ticket.event_id}` : "Event inconnu")
-  );
-}
 
 // ---------------------------------------------------------------------------
 // D1 data access
@@ -379,23 +326,6 @@ async function setSyncState(db, organizerId, bootstrapped, cursor) {
 // Telegram
 // ---------------------------------------------------------------------------
 
-function toTelegramIntegerChatId(chatId) {
-  const s = String(chatId || "").trim();
-  if (!/^-?\d+$/.test(s)) return null;
-  const n = Number(s);
-  return Number.isSafeInteger(n) ? n : null;
-}
-
-/** D1/SQLite peut renvoyer 0/1 en nombre ou parfois "1" en chaîne. */
-function sqliteIntFlagIsOn(value) {
-  return value === 1 || value === true || value === "1";
-}
-
-/** Uniquement les canaux (affichage « au nom du chat » fiable côté Telegram). */
-function organizerTargetSupportsSendAsChat(organizer) {
-  const type = String(organizer.telegram_chat_type || "").toLowerCase();
-  return type === "channel";
-}
 
 async function sendTelegram(telegramToken, chatId, text, options) {
   const useSenderChat =
@@ -431,34 +361,6 @@ async function sendTelegram(telegramToken, chatId, text, options) {
 // Notification message building
 // ---------------------------------------------------------------------------
 
-function buildNotificationData(notification, eventCountCache, dealCountCache, dealsMap) {
-  const totalSold = eventCountCache.get(notification.eventId) || 0;
-  const eventDeals = dealsMap.get(notification.eventId);
-  const dealLines = [];
-
-  for (const [title] of notification.newDeals) {
-    const sold = dealCountCache.get(`${notification.eventId}:${title}`) || 0;
-    const max = eventDeals ? eventDeals.get(title) || 0 : 0;
-    const line = max > 0 ? `${title} : ${sold}/${max}` : `${title} : ${sold}`;
-    dealLines.push(line);
-  }
-
-  const newCount = notification.newCount;
-
-  return {
-    event_name: notification.eventName,
-    event_id: notification.eventId,
-    new_tickets_count: String(newCount),
-    new_tickets_label:
-      newCount > 1 ? `${newCount} billets vendus` : "1 billet vendu",
-    event_total_sold: String(totalSold),
-    deal_lines: dealLines.join("\n"),
-    first_deal_name: dealLines.length > 0 ? notification.newDeals.keys().next().value : "",
-    first_deal_sold: dealLines.length > 0
-      ? String(dealCountCache.get(`${notification.eventId}:${notification.newDeals.keys().next().value}`) || 0)
-      : "",
-  };
-}
 
 function renderNotificationMessage(organizer, notificationData, showEventName) {
   let template;

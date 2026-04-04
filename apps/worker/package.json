@@ -7,13 +7,16 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"db:migrate:local": "wrangler d1 migrations apply notifshotgun-db --local",
-		"db:migrate:remote": "wrangler d1 migrations apply notifshotgun-db --remote"
+		"db:migrate:remote": "wrangler d1 migrations apply notifshotgun-db --remote",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"@sentry/cloudflare": "^10.47.0",
 		"@shotgun-notifier/shared": "*"
 	},
 	"devDependencies": {
+		"vitest": "^4.1.2",
 		"wrangler": "^4.72.0"
 	}
 }
