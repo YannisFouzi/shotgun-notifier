@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LanguageToggle } from "@/components/language-toggle";
 import { TelegramPreview } from "@/components/telegram-preview";
 import { SiteFooter } from "@/components/site-footer";
+import { FeedbackSection } from "@/components/feedback-section";
 import {
   normalizeShotgunToken,
   saveStoredShotgunToken,
@@ -163,7 +164,12 @@ export function HomePageClient() {
         </div>
       </div>
     </main>
-    <SiteFooter variant="home" />
+    <div className="bg-[#050608]">
+      <div className="mx-auto w-full max-w-2xl px-4 pb-8 [&_[data-slot=card]]:bg-transparent">
+        <FeedbackSection />
+      </div>
+      <SiteFooter variant="home" />
+    </div>
     </>
   );
 }
