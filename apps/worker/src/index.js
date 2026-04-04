@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/cloudflare";
 import {
   renderMessageTemplateWithData,
   normalizeMessageTemplateSettings,
@@ -1166,70 +1167,80 @@ function matchRoute(method, pathname) {
 // Worker entry
 // ---------------------------------------------------------------------------
 
-export default {
-  async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(runCron(env.DB));
-  },
+const SENTRY_DSN =
+  "https://5115235bd662c08eb9adb4a7b9768ae4@o4511158959931392.ingest.de.sentry.io/4511159575052368";
 
-  async fetch(request, env) {
-    const allowedOrigins = parseAllowedOrigins(env);
-    const requestOrigin = request.headers.get("Origin") || "";
-    const corsOrigin = matchOrigin(allowedOrigins, requestOrigin);
+export default Sentry.withSentry(
+  () => ({
+    dsn: SENTRY_DSN,
+    tracesSampleRate: 0.2,
+  }),
+  {
+    async scheduled(_controller, env, ctx) {
+      ctx.waitUntil(runCron(env.DB));
+    },
 
-    // Preflight
-    if (request.method === "OPTIONS") {
-      if (requestOrigin && !corsOrigin) {
-        return new Response(null, { status: 403 });
-      }
-      return corsPreflightResponse(corsOrigin);
-    }
+    async fetch(request, env) {
+      const allowedOrigins = parseAllowedOrigins(env);
+      const requestOrigin = request.headers.get("Origin") || "";
+      const corsOrigin = matchOrigin(allowedOrigins, requestOrigin);
 
-    const url = new URL(request.url);
-
-    // Health check (no CORS — useful for uptime monitoring)
-    if (url.pathname === "/" || url.pathname === "/health") {
-      return jsonResponse({ ok: true, version: VERSION });
-    }
-
-    // Block cross-origin API requests from unauthorized origins
-    if (requestOrigin && !corsOrigin) {
-      return new Response(JSON.stringify({ error: "Origin not allowed" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Rate limiting on sensitive endpoints
-    if (RATE_LIMITS[url.pathname]) {
-      const ip = getClientIp(request);
-      const retryAfter = await checkRateLimit(env.DB, ip, url.pathname);
-      if (retryAfter !== null) {
-        return withCors(rateLimitResponse(retryAfter), corsOrigin);
-      }
-    }
-
-    // All API responses get CORS headers for the allowed origin
-    try {
-      let response;
-
-      // Feedback (needs env, not db)
-      if (url.pathname === "/api/feedback" && request.method === "POST") {
-        response = await handleFeedback(request, env);
-      } else {
-        const route = matchRoute(request.method, url.pathname);
-        if (!route) {
-          return withCors(jsonResponse({ error: "Not found" }, 404), corsOrigin);
+      // Preflight
+      if (request.method === "OPTIONS") {
+        if (requestOrigin && !corsOrigin) {
+          return new Response(null, { status: 403 });
         }
-        response = await route.handler(request, env.DB);
+        return corsPreflightResponse(corsOrigin);
       }
 
-      return withCors(response, corsOrigin);
-    } catch (error) {
-      console.error(`[${VERSION}] API error:`, error);
-      return withCors(
-        jsonResponse({ error: "Erreur interne" }, 500),
-        corsOrigin
-      );
-    }
-  },
-};
+      const url = new URL(request.url);
+
+      // Health check (no CORS — useful for uptime monitoring)
+      if (url.pathname === "/" || url.pathname === "/health") {
+        return jsonResponse({ ok: true, version: VERSION });
+      }
+
+      // Block cross-origin API requests from unauthorized origins
+      if (requestOrigin && !corsOrigin) {
+        return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Rate limiting on sensitive endpoints
+      if (RATE_LIMITS[url.pathname]) {
+        const ip = getClientIp(request);
+        const retryAfter = await checkRateLimit(env.DB, ip, url.pathname);
+        if (retryAfter !== null) {
+          return withCors(rateLimitResponse(retryAfter), corsOrigin);
+        }
+      }
+
+      // All API responses get CORS headers for the allowed origin
+      try {
+        let response;
+
+        // Feedback (needs env, not db)
+        if (url.pathname === "/api/feedback" && request.method === "POST") {
+          response = await handleFeedback(request, env);
+        } else {
+          const route = matchRoute(request.method, url.pathname);
+          if (!route) {
+            return withCors(jsonResponse({ error: "Not found" }, 404), corsOrigin);
+          }
+          response = await route.handler(request, env.DB);
+        }
+
+        return withCors(response, corsOrigin);
+      } catch (error) {
+        Sentry.captureException(error);
+        console.error(`[${VERSION}] API error:`, error);
+        return withCors(
+          jsonResponse({ error: "Erreur interne" }, 500),
+          corsOrigin
+        );
+      }
+    },
+  }
+);

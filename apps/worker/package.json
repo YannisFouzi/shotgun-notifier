@@ -10,6 +10,7 @@
 		"db:migrate:remote": "wrangler d1 migrations apply notifshotgun-db --remote"
 	},
 	"dependencies": {
+		"@sentry/cloudflare": "^10.47.0",
 		"@shotgun-notifier/shared": "*"
 	},
 	"devDependencies": {
