@@ -22,7 +22,7 @@ export function Demo({
   const titleBaseFontSize = 82;
   const titleCompactFontSize = 54;
   const line2Delay = fps;
-  const line3Delay = fps * 2;
+  const line3Delay = Math.round(fps * 2.5);
   const titleHoldFrames = line3Delay + fps * 2;
   const titleMoveProgress = spring({
     frame: frame - titleHoldFrames,
@@ -128,15 +128,41 @@ export function Demo({
             alignItems: "center",
             justifyContent: "center",
             minHeight: 0,
+            padding: "24px 0",
           }}
         >
           <IPhoneLockScreenMockup
             messages={COPY.demo.messages}
-            width={700}
+            width={640}
             delay={titleHoldFrames + 4}
             time="14:30"
             date="Samedi 5 avril"
           />
+        </div>
+
+        {/* shotnotif.com below phone — appears with phone */}
+        <div
+          style={{
+            textAlign: "center",
+            paddingBottom: 8,
+            opacity: titleMoveProgress,
+            transform: `translateY(${interpolate(titleMoveProgress, [0, 1], [20, 0])}px)`,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontSize: 110,
+              fontWeight: 800,
+              letterSpacing: "-0.03em",
+              background: `linear-gradient(135deg, ${COLORS.text} 0%, ${COLORS.telegram} 100%)`,
+              color: "transparent",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            shotnotif.com
+          </span>
         </div>
       </SceneFrame>
   ) : null;

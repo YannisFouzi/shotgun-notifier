@@ -12,8 +12,8 @@
     "contactLabel": "Contact"
   },
   "home": {
-    "title": "Recevez un message sur Telegram à chaque vente Shotgun",
-    "subtitle": "Configurez vos notifications en quelques secondes.",
+    "title": "Recevez une notification via Telegram pour vos ventes Shotgun",
+    "subtitle": "Configurable en quelques secondes.",
     "step1Before": "1. Connectez-vous à votre compte Shotgun et accédez à la page",
     "step1Integrations": "Integrations",
     "step1After": "en",

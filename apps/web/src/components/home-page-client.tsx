@@ -156,7 +156,7 @@ export function HomePageClient() {
                 <LanguageToggle className="border-white/15 bg-black/30" />
               </div>
               <div className="flex w-full min-w-0 justify-center overflow-x-hidden">
-                <TelegramPreview message={activeMessage} mode="group" />
+                <TelegramPreview message={activeMessage} mode="group" animated messages={previewMessages} />
               </div>
             </div>
           </section>

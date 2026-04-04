@@ -21,6 +21,8 @@ export interface IOSNotification {
   opacity?: number;
   /** Optional translateY offset for animation (default 0) */
   translateY?: number;
+  /** Whether this notification just appeared (for CSS transition entry) */
+  isNew?: boolean;
 }
 
 export interface IOSLockScreenProps {

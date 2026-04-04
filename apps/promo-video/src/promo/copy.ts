@@ -3,7 +3,7 @@ import type { LockScreenMessage } from "./mockups/IPhoneLockScreenMockup";
 export const COPY = {
   demo: {
     line1: "Tu es organisateur sur Shotgun ?",
-    line2: "Jusqu’ici, tu ne pouvais pas être\nnotifié à chaque vente.",
+    line2: "Jusqu’ici, tu ne pouvais pas être\nnotifié de tes ventes.",
     line3: "Aujourd’hui, avec ShotNotif,\nc’est enfin possible.",
     messages: [
       {

@@ -1,12 +1,11 @@
 import type { CSSProperties } from "react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { COLORS, FONT_BODY } from "../constants";
+import { COLORS, FONT_BODY, FONT_DISPLAY } from "../constants";
 import { COPY } from "../copy";
 import type { LockScreenMessage } from "../mockups/IPhoneLockScreenMockup";
 import { IPhoneLockScreenMockup } from "../mockups/IPhoneLockScreenMockup";
-import { BrandTitle, FadeUp, SceneBg, SceneFrame } from "../ui";
+import { FadeUp, SceneBg, SceneFrame } from "../ui";
 
-/** Same messages as Demo but with much shorter delays */
 const FAST_MESSAGES: LockScreenMessage[] = COPY.demo.messages.map((msg, i) => ({
   ...msg,
   delay: i * 16,
@@ -30,32 +29,18 @@ export function Outro({
   const deviceScale = phoneWidth / 428;
   const phoneVisibleHeight = 868 * deviceScale;
 
-  // Phone disappears at frame 80 (≈ 22:10 in the video)
   const removePhoneAt = 80;
-  const hidePhoneProgress = spring({
+  const p = spring({
     frame: frame - removePhoneAt,
     fps,
     config: { mass: 0.85, damping: 16, stiffness: 120 },
   });
-  const phoneWrapperHeight = interpolate(
-    hidePhoneProgress,
-    [0, 1],
-    [phoneVisibleHeight, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-  );
-  const phoneOpacity = interpolate(hidePhoneProgress, [0, 1], [1, 0], {
+
+  const phoneWrapperHeight = interpolate(p, [0, 1], [phoneVisibleHeight, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const phoneScale = interpolate(hidePhoneProgress, [0, 1], [1, 0.94], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const groupTranslateY = interpolate(hidePhoneProgress, [0, 1], [-34, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const groupGap = interpolate(hidePhoneProgress, [0, 1], [28, 12], {
+  const phoneOpacity = interpolate(p, [0, 1], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -69,68 +54,49 @@ export function Outro({
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            gap: groupGap,
-            transform: `translateY(${groupTranslateY}px)`,
+            gap: 0,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 14,
-              textAlign: "center",
-            }}
-          >
-            <FadeUp>
-              <BrandTitle size={144} />
-            </FadeUp>
+          <FadeUp>
+            <span
+              style={{
+                fontFamily: FONT_BODY,
+                fontSize: 52,
+                fontWeight: 700,
+                color: COLORS.text,
+                letterSpacing: "0.01em",
+              }}
+            >
+              Configurable en quelques secondes
+            </span>
+          </FadeUp>
 
-            <FadeUp delay={6}>
-              <span
-                style={{
-                  fontFamily: FONT_BODY,
-                  fontSize: 56,
-                  fontWeight: 800,
-                  color: COLORS.text,
-                  letterSpacing: "0.01em",
-                }}
-              >
-                {COPY.outro.url}
-              </span>
-            </FadeUp>
+          <FadeUp delay={6}>
+            <span
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontSize: 110,
+                fontWeight: 800,
+                letterSpacing: "-0.03em",
+                background: `linear-gradient(135deg, ${COLORS.text} 0%, ${COLORS.telegram} 100%)`,
+                color: "transparent",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              {COPY.outro.url}
+            </span>
+          </FadeUp>
 
-            <FadeUp delay={8}>
-              <span
-                style={{
-                  fontFamily: FONT_BODY,
-                  fontSize: 24,
-                  fontWeight: 600,
-                  color: COLORS.textMuted,
-                  letterSpacing: "0.01em",
-                }}
-              >
-                Directement sur Telegram
-              </span>
-            </FadeUp>
-          </div>
-
+          {/* Phone — collapses height + fades, texts naturally center via flex */}
           <div
             style={{
               height: phoneWrapperHeight,
               overflow: "hidden",
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "center",
+              marginTop: phoneWrapperHeight > 1 ? 24 : 0,
             }}
           >
-            <div
-              style={{
-                opacity: phoneOpacity,
-                transform: `scale(${phoneScale})`,
-                transformOrigin: "center top",
-              }}
-            >
+            <div style={{ opacity: phoneOpacity }}>
               <IPhoneLockScreenMockup
                 messages={FAST_MESSAGES}
                 width={700}
