@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import PlausibleProvider from "next-plausible";
 import { Providers } from "@/app/providers";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -45,11 +46,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        <script
-          defer
-          data-domain="shotnotif.vercel.app"
-          src="https://plausible.io/js/pa-Ku_vXATvA-B2g_CAxGSxo.js"
-        />
+        <PlausibleProvider src="https://plausible.io/js/pa-Ku_vXATvA-B2g_CAxGSxo.js" />
       </head>
       <body className={cn("font-sans antialiased", geist.variable)}>
         <Providers>{children}</Providers>
