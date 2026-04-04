@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Geist } from "next/font/google";
 import { Providers } from "@/app/providers";
 import { cn } from "@/lib/utils";
@@ -46,11 +45,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        <Script
+        <script
           defer
           data-domain="shotnotif.vercel.app"
           src="https://plausible.io/js/pa-Ku_vXATvA-B2g_CAxGSxo.js"
-          strategy="afterInteractive"
         />
       </head>
       <body className={cn("font-sans antialiased", geist.variable)}>
