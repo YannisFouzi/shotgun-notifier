@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 // ---------------------------------------------------------------------------
 // Pure / near-pure helpers extracted for testability
 // ---------------------------------------------------------------------------
@@ -6,6 +8,12 @@ const COUNTED_STATUSES = new Set(["valid", "resold"]);
 const CHECK_INTERVAL_OPTIONS = new Set([1, 5, 10, 60, 300, 720, 1440, 10080]);
 const DEFAULT_CHECK_INTERVAL = 1;
 const DEFAULT_ALLOWED_ORIGINS = "https://shotnotif.com,https://www.shotnotif.com,https://shotnotif.vercel.app";
+const MERCI_LILLE_ORGANIZER_ID = "183206";
+const SHOTNOTIF_TRIGGER = "new_event_detected";
+const SHOTNOTIF_SOURCE = "shotnotif";
+const DEFAULT_SHOTNOTIF_INTEGRATION_URL =
+  "https://api.mercilille.com/api/integrations/shotnotif/events/detected";
+const SHOTNOTIF_RETRY_DELAYS_MINUTES = [1, 5, 15, 60, 360, 1440];
 
 export function toInt(value) {
   const parsed = Number(value);
@@ -124,4 +132,87 @@ export function isValidCheckInterval(value) {
   return CHECK_INTERVAL_OPTIONS.has(value);
 }
 
-export { CHECK_INTERVAL_OPTIONS, DEFAULT_CHECK_INTERVAL, COUNTED_STATUSES };
+export function isMerciLilleOrganizer(organizerId) {
+  return String(organizerId || "").trim() === MERCI_LILLE_ORGANIZER_ID;
+}
+
+export function getShotnotifIntegrationUrl(env) {
+  return String(env?.SHOTNOTIF_INTEGRATION_URL || DEFAULT_SHOTNOTIF_INTEGRATION_URL).trim();
+}
+
+export function buildShotnotifRequestId(eventId, detectedAt) {
+  return `shotnotif-${String(eventId || "").trim()}-${String(detectedAt || "").trim()}`;
+}
+
+export function buildShotnotifIntegrationBody({
+  organizerId,
+  shotgunEventId,
+  requestId,
+  detectedAt,
+  eventName = "",
+}) {
+  const body = {
+    organizerId: String(organizerId || "").trim(),
+    shotgunEventId: toInt(shotgunEventId),
+    requestId: String(requestId || "").trim(),
+    detectedAt: String(detectedAt || "").trim(),
+    trigger: SHOTNOTIF_TRIGGER,
+    source: SHOTNOTIF_SOURCE,
+  };
+
+  const normalizedEventName = String(eventName || "").trim();
+  if (normalizedEventName) {
+    body.eventName = normalizedEventName;
+  }
+
+  return body;
+}
+
+export function buildShotnotifSignaturePayload({
+  timestamp,
+  method,
+  path,
+  organizerId,
+  shotgunEventId,
+  requestId,
+  detectedAt,
+  trigger = SHOTNOTIF_TRIGGER,
+}) {
+  return [
+    String(timestamp || "").trim(),
+    String(method || "").trim().toUpperCase(),
+    String(path || "").trim(),
+    String(organizerId || "").trim(),
+    String(shotgunEventId || "").trim(),
+    String(requestId || "").trim(),
+    String(detectedAt || "").trim(),
+    String(trigger || "").trim(),
+  ].join("\n");
+}
+
+export function createShotnotifSignature(secret, payload) {
+  return `sha256=${createHmac("sha256", String(secret || "")).update(String(payload || "")).digest("hex")}`;
+}
+
+export function getShotnotifRetryDelayMinutes(attemptNumber) {
+  const normalized = Math.max(1, toInt(attemptNumber));
+  const index = Math.min(normalized - 1, SHOTNOTIF_RETRY_DELAYS_MINUTES.length - 1);
+  return SHOTNOTIF_RETRY_DELAYS_MINUTES[index];
+}
+
+export function getShotnotifRetryAt(nowIso, attemptNumber) {
+  const startMs = Date.parse(String(nowIso || ""));
+  if (Number.isNaN(startMs)) return "";
+  const delayMs = getShotnotifRetryDelayMinutes(attemptNumber) * 60 * 1000;
+  return new Date(startMs + delayMs).toISOString();
+}
+
+export {
+  CHECK_INTERVAL_OPTIONS,
+  DEFAULT_CHECK_INTERVAL,
+  COUNTED_STATUSES,
+  DEFAULT_SHOTNOTIF_INTEGRATION_URL,
+  MERCI_LILLE_ORGANIZER_ID,
+  SHOTNOTIF_TRIGGER,
+  SHOTNOTIF_SOURCE,
+};

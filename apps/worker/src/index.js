@@ -21,6 +21,13 @@ import {
   isValidCheckInterval,
   CHECK_INTERVAL_OPTIONS,
   DEFAULT_CHECK_INTERVAL,
+  isMerciLilleOrganizer,
+  getShotnotifIntegrationUrl,
+  buildShotnotifRequestId,
+  buildShotnotifIntegrationBody,
+  buildShotnotifSignaturePayload,
+  createShotnotifSignature,
+  getShotnotifRetryAt,
 } from "./helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -35,6 +42,10 @@ const TELEGRAM_API_BASE = "https://api.telegram.org";
 
 const BOOTSTRAP_MAX_PAGES = 200;
 const SYNC_MAX_PAGES_PER_RUN = 10;
+const ORGANIZER_EVENT_STATUS_KNOWN = "known";
+const ORGANIZER_EVENT_STATUS_PENDING = "pending";
+const ORGANIZER_EVENT_STATUS_DONE = "done";
+const ORGANIZER_EVENT_STATUS_RETRY = "retry";
 
 // Rate limit: { max requests, window in seconds }
 const RATE_LIMITS = {
@@ -231,6 +242,183 @@ async function fetchEvents(organizerId, shotgunToken) {
   });
 }
 
+function getShotnotifIntegrationConfig(env, organizerId) {
+  const normalizedOrganizerId = String(organizerId || "").trim();
+  if (!isMerciLilleOrganizer(normalizedOrganizerId)) {
+    return null;
+  }
+
+  return {
+    organizerId: normalizedOrganizerId,
+    secret: String(env?.SHOTNOTIF_INTEGRATION_SECRET || "").trim(),
+    url: getShotnotifIntegrationUrl(env),
+  };
+}
+
+async function postDetectedEventToMerciLille(env, organizerId, trackedEvent) {
+  const config = getShotnotifIntegrationConfig(env, organizerId);
+  if (!config) {
+    return { skipped: true, reason: "organizer_not_eligible" };
+  }
+
+  if (!config.secret) {
+    return { skipped: true, reason: "missing_secret" };
+  }
+
+  const url = new URL(config.url);
+  const method = "POST";
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const eventId = toInt(trackedEvent.event_id);
+  const detectedAt = String(trackedEvent.first_seen_at || "").trim();
+  const requestId =
+    String(trackedEvent.integration_request_id || "").trim() ||
+    buildShotnotifRequestId(eventId, detectedAt || new Date().toISOString());
+  const body = buildShotnotifIntegrationBody({
+    organizerId: config.organizerId,
+    shotgunEventId: eventId,
+    requestId,
+    detectedAt,
+    eventName: trackedEvent.event_name,
+  });
+  const signaturePayload = buildShotnotifSignaturePayload({
+    timestamp,
+    method,
+    path: url.pathname,
+    organizerId: body.organizerId,
+    shotgunEventId: body.shotgunEventId,
+    requestId: body.requestId,
+    detectedAt: body.detectedAt,
+    trigger: body.trigger,
+  });
+  const signature = createShotnotifSignature(config.secret, signaturePayload);
+
+  const response = await fetchWithTimeout(
+    url.toString(),
+    {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Integration-Timestamp": timestamp,
+        "X-Integration-Signature": signature,
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  const raw = await response.text();
+  let parsed = null;
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = null;
+  }
+
+  if (!response.ok || parsed?.success === false) {
+    const message =
+      parsed?.message ||
+      parsed?.error ||
+      raw ||
+      `Unexpected integration response (${response.status})`;
+    throw new Error(`Merci Lille integration failed (${response.status}): ${message}`);
+  }
+
+  return {
+    skipped: false,
+    data: parsed,
+  };
+}
+
+async function processOrganizerEventExports(db, env, organizer) {
+  const config = getShotnotifIntegrationConfig(env, organizer.id);
+  if (!config) {
+    return {
+      eligible: false,
+      discovered: 0,
+      attempted: 0,
+      delivered: 0,
+      failed: 0,
+      blocked: 0,
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  const dueRows = await listDueOrganizerEventExports(db, organizer.id, nowIso);
+
+  if (!config.secret) {
+    if (dueRows.length > 0) {
+      console.warn(
+        `[${VERSION}] ShotNotif integration skipped for organizer ${organizer.id}: missing SHOTNOTIF_INTEGRATION_SECRET`
+      );
+    }
+
+    return {
+      eligible: true,
+      discovered: 0,
+      attempted: 0,
+      delivered: 0,
+      failed: 0,
+      blocked: dueRows.length,
+    };
+  }
+
+  let delivered = 0;
+  let failed = 0;
+
+  for (const trackedEvent of dueRows) {
+    const eventId = String(trackedEvent.event_id || "").trim();
+    if (!eventId) continue;
+
+    const attemptedAt = new Date().toISOString();
+    const attemptCount = toInt(trackedEvent.integration_attempts) + 1;
+
+    try {
+      const result = await postDetectedEventToMerciLille(env, organizer.id, trackedEvent);
+      if (result.skipped) continue;
+
+      await markOrganizerEventExportSuccess(
+        db,
+        organizer.id,
+        eventId,
+        attemptCount,
+        attemptedAt
+      );
+
+      delivered += 1;
+      console.log(
+        `[${VERSION}] Exported new event ${eventId} for organizer ${organizer.id} to Merci Lille`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const nextRetryAt = getShotnotifRetryAt(attemptedAt, attemptCount) || attemptedAt;
+
+      await markOrganizerEventExportFailure(
+        db,
+        organizer.id,
+        eventId,
+        attemptCount,
+        attemptedAt,
+        nextRetryAt,
+        message
+      );
+
+      failed += 1;
+      console.error(
+        `[${VERSION}] Merci Lille export failed for organizer ${organizer.id}, event ${eventId}:`,
+        message
+      );
+    }
+  }
+
+  return {
+    eligible: true,
+    discovered: 0,
+    attempted: dueRows.length,
+    delivered,
+    failed,
+    blocked: 0,
+  };
+}
+
 
 // ---------------------------------------------------------------------------
 // D1 data access
@@ -307,18 +495,207 @@ async function getSyncState(db, organizerId) {
     .prepare("SELECT * FROM sync_state WHERE organizer_id = ?")
     .bind(organizerId)
     .first();
-  return row || { organizer_id: organizerId, bootstrapped: 0, cursor: "" };
+  if (!row) {
+    return {
+      organizer_id: organizerId,
+      bootstrapped: 0,
+      cursor: "",
+      events_seeded: 0,
+    };
+  }
+
+  return {
+    ...row,
+    bootstrapped: toInt(row.bootstrapped),
+    cursor: row.cursor || "",
+    events_seeded: toInt(row.events_seeded),
+  };
 }
 
-async function setSyncState(db, organizerId, bootstrapped, cursor) {
+async function setSyncState(db, organizerId, bootstrapped, cursor, eventsSeeded) {
   await db
     .prepare(
-      `INSERT INTO sync_state (organizer_id, bootstrapped, cursor, updated_at)
-       VALUES (?, ?, ?, datetime('now'))
+      `INSERT INTO sync_state (organizer_id, bootstrapped, cursor, events_seeded, updated_at)
+       VALUES (?, ?, ?, ?, datetime('now'))
        ON CONFLICT (organizer_id)
-       DO UPDATE SET bootstrapped = excluded.bootstrapped, cursor = excluded.cursor, updated_at = excluded.updated_at`
+       DO UPDATE SET
+         bootstrapped = excluded.bootstrapped,
+         cursor = excluded.cursor,
+         events_seeded = excluded.events_seeded,
+         updated_at = excluded.updated_at`
     )
-    .bind(organizerId, bootstrapped ? 1 : 0, cursor)
+    .bind(organizerId, bootstrapped ? 1 : 0, cursor, eventsSeeded ? 1 : 0)
+    .run();
+}
+
+async function listOrganizerEvents(db, organizerId) {
+  const { results } = await db
+    .prepare("SELECT * FROM organizer_events WHERE organizer_id = ?")
+    .bind(organizerId)
+    .all();
+  return Array.isArray(results) ? results : [];
+}
+
+async function registerOrganizerEvents(db, organizerId, events, { queueNewEvents }) {
+  const existingRows = await listOrganizerEvents(db, organizerId);
+  const existingMap = new Map(
+    existingRows.map((row) => [String(row.event_id || "").trim(), row])
+  );
+  const nowIso = new Date().toISOString();
+  const statements = [];
+  let discovered = 0;
+  let queued = 0;
+
+  for (const event of events) {
+    const eventId = String(event.id || "").trim();
+    const eventName = String(event.name || "").trim();
+    if (!eventId) continue;
+
+    if (existingMap.has(eventId)) {
+      statements.push(
+        db
+          .prepare(
+            `UPDATE organizer_events
+             SET event_name = ?, last_seen_at = ?
+             WHERE organizer_id = ? AND event_id = ?`
+          )
+          .bind(eventName, nowIso, organizerId, eventId)
+      );
+      continue;
+    }
+
+    discovered += 1;
+
+    const integrationStatus = queueNewEvents
+      ? ORGANIZER_EVENT_STATUS_PENDING
+      : ORGANIZER_EVENT_STATUS_KNOWN;
+    const requestId = queueNewEvents ? buildShotnotifRequestId(eventId, nowIso) : "";
+    const nextRetryAt = queueNewEvents ? nowIso : "";
+
+    if (queueNewEvents) {
+      queued += 1;
+    }
+
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO organizer_events (
+             organizer_id,
+             event_id,
+             event_name,
+             first_seen_at,
+             last_seen_at,
+             integration_status,
+             integration_attempts,
+             integration_request_id,
+             next_retry_at,
+             last_integration_attempt_at,
+             integrated_at,
+             last_integration_error
+           )
+           VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, '', '', '')`
+        )
+        .bind(
+          organizerId,
+          eventId,
+          eventName,
+          nowIso,
+          nowIso,
+          integrationStatus,
+          requestId,
+          nextRetryAt
+        )
+    );
+  }
+
+  for (let i = 0; i < statements.length; i += 400) {
+    await db.batch(statements.slice(i, i + 400));
+  }
+
+  return {
+    discovered,
+    queued,
+    seeded: queueNewEvents ? 0 : discovered,
+  };
+}
+
+async function listDueOrganizerEventExports(db, organizerId, nowIso) {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM organizer_events
+       WHERE organizer_id = ?
+         AND integration_status IN (?, ?)
+         AND (next_retry_at = '' OR next_retry_at <= ?)
+       ORDER BY first_seen_at ASC, event_id ASC`
+    )
+    .bind(
+      organizerId,
+      ORGANIZER_EVENT_STATUS_PENDING,
+      ORGANIZER_EVENT_STATUS_RETRY,
+      nowIso
+    )
+    .all();
+
+  return Array.isArray(results) ? results : [];
+}
+
+async function markOrganizerEventExportSuccess(
+  db,
+  organizerId,
+  eventId,
+  attemptCount,
+  attemptedAt
+) {
+  await db
+    .prepare(
+      `UPDATE organizer_events
+       SET integration_status = ?,
+           integration_attempts = ?,
+           last_integration_attempt_at = ?,
+           integrated_at = ?,
+           next_retry_at = '',
+           last_integration_error = ''
+       WHERE organizer_id = ? AND event_id = ?`
+    )
+    .bind(
+      ORGANIZER_EVENT_STATUS_DONE,
+      attemptCount,
+      attemptedAt,
+      attemptedAt,
+      organizerId,
+      eventId
+    )
+    .run();
+}
+
+async function markOrganizerEventExportFailure(
+  db,
+  organizerId,
+  eventId,
+  attemptCount,
+  attemptedAt,
+  nextRetryAt,
+  errorMessage
+) {
+  await db
+    .prepare(
+      `UPDATE organizer_events
+       SET integration_status = ?,
+           integration_attempts = ?,
+           last_integration_attempt_at = ?,
+           next_retry_at = ?,
+           last_integration_error = ?
+       WHERE organizer_id = ? AND event_id = ?`
+    )
+    .bind(
+      ORGANIZER_EVENT_STATUS_RETRY,
+      attemptCount,
+      attemptedAt,
+      nextRetryAt,
+      errorMessage,
+      organizerId,
+      eventId
+    )
     .run();
 }
 
@@ -426,6 +803,17 @@ async function bootstrapOrganizer(db, organizer) {
   console.log(`[${VERSION}] Bootstrap started for organizer ${organizerId}`);
 
   const events = await fetchEvents(organizerId, shotgunToken);
+  const shouldTrackOrganizerEvents = isMerciLilleOrganizer(organizerId);
+  if (shouldTrackOrganizerEvents) {
+    const registered = await registerOrganizerEvents(db, organizerId, events, {
+      queueNewEvents: false,
+    });
+    if (registered.seeded > 0) {
+      console.log(
+        `[${VERSION}] Seeded ${registered.seeded} existing events for organizer ${organizerId} without exporting them`
+      );
+    }
+  }
   const allRows = [];
 
   for (const event of events) {
@@ -515,7 +903,7 @@ async function bootstrapOrganizer(db, organizer) {
     }
   }
 
-  await setSyncState(db, organizerId, true, lastCursor);
+  await setSyncState(db, organizerId, true, lastCursor, shouldTrackOrganizerEvents);
 
   console.log(
     `[${VERSION}] Bootstrap completed for ${organizerId}: ${allRows.length} tickets, ${eventCounts.size} events`
@@ -526,12 +914,34 @@ async function bootstrapOrganizer(db, organizer) {
 // Incremental sync
 // ---------------------------------------------------------------------------
 
-async function syncOrganizer(db, organizer, maxPagesPerEvent = SYNC_MAX_PAGES_PER_RUN) {
+async function syncOrganizer(db, env, organizer, maxPagesPerEvent = SYNC_MAX_PAGES_PER_RUN) {
   const { id: organizerId, shotgun_token: shotgunToken } = organizer;
   const syncState = await getSyncState(db, organizerId);
   const cursor = syncState.cursor || "";
+  const shouldTrackOrganizerEvents = isMerciLilleOrganizer(organizerId);
+  let eventsSeeded = sqliteIntFlagIsOn(syncState.events_seeded);
 
   const events = await fetchEvents(organizerId, shotgunToken);
+  let eventRegistry = {
+    discovered: 0,
+    queued: 0,
+    seeded: 0,
+  };
+
+  if (shouldTrackOrganizerEvents) {
+    eventRegistry = await registerOrganizerEvents(db, organizerId, events, {
+      queueNewEvents: eventsSeeded,
+    });
+    if (!eventsSeeded) {
+      eventsSeeded = true;
+      if (eventRegistry.seeded > 0) {
+        console.log(
+          `[${VERSION}] Seeded ${eventRegistry.seeded} existing events for organizer ${organizerId} without exporting them`
+        );
+      }
+    }
+  }
+
   const headers = shotgunHeaders(shotgunToken);
   const rows = [];
 
@@ -548,8 +958,6 @@ async function syncOrganizer(db, organizer, maxPagesPerEvent = SYNC_MAX_PAGES_PE
       nextUrl = json?.pagination?.next || "";
     }
   }
-
-  if (rows.length === 0) return { processed: 0, notifications: 0 };
 
   const showEventName = events.length > 1;
   const dealsMap = new Map();
@@ -629,6 +1037,8 @@ async function syncOrganizer(db, organizer, maxPagesPerEvent = SYNC_MAX_PAGES_PE
     }
   }
 
+  const exportResult = await processOrganizerEventExports(db, env, organizer);
+
   // Send notifications
   let sent = 0;
   if (organizer.telegram_token && organizer.telegram_chat_id) {
@@ -652,16 +1062,25 @@ async function syncOrganizer(db, organizer, maxPagesPerEvent = SYNC_MAX_PAGES_PE
     }
   }
 
-  await setSyncState(db, organizerId, true, lastCursor);
+  await setSyncState(db, organizerId, true, lastCursor, eventsSeeded);
 
-  return { processed: rows.length, notifications: sent };
+  return {
+    processed: rows.length,
+    notifications: sent,
+    newEventsDiscovered: eventRegistry.discovered,
+    newEventsQueued: eventRegistry.queued,
+    eventExportsAttempted: exportResult.attempted,
+    eventExportsDelivered: exportResult.delivered,
+    eventExportsFailed: exportResult.failed,
+    eventExportsBlocked: exportResult.blocked,
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Cron handler — multi-tenant
 // ---------------------------------------------------------------------------
 
-async function runCron(db) {
+async function runCron(db, env) {
   const { results: organizers } = await db
     .prepare(
       `SELECT * FROM organizers
@@ -689,7 +1108,7 @@ async function runCron(db) {
       } else {
         const interval = toInt(organizer.check_interval) || DEFAULT_CHECK_INTERVAL;
         const maxPages = interval > 1 ? BOOTSTRAP_MAX_PAGES : SYNC_MAX_PAGES_PER_RUN;
-        const syncResult = await syncOrganizer(db, organizer, maxPages);
+        const syncResult = await syncOrganizer(db, env, organizer, maxPages);
         results.push({
           organizerId: organizer.id,
           mode: "sync",
@@ -1129,7 +1548,7 @@ export default Sentry.withSentry(
   }),
   {
     async scheduled(_controller, env, ctx) {
-      ctx.waitUntil(runCron(env.DB));
+      ctx.waitUntil(runCron(env.DB, env));
     },
 
     async fetch(request, env) {

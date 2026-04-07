@@ -13,6 +13,14 @@ import {
   buildTicketsUrl,
   buildNotificationData,
   isValidCheckInterval,
+  isMerciLilleOrganizer,
+  getShotnotifIntegrationUrl,
+  buildShotnotifRequestId,
+  buildShotnotifIntegrationBody,
+  buildShotnotifSignaturePayload,
+  createShotnotifSignature,
+  getShotnotifRetryDelayMinutes,
+  getShotnotifRetryAt,
 } from "./helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -325,5 +333,152 @@ describe("isValidCheckInterval", () => {
     expect(isValidCheckInterval(2)).toBe(false);
     expect(isValidCheckInterval(999)).toBe(false);
     expect(isValidCheckInterval(-1)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ShotNotif / Merci Lille integration helpers
+// ---------------------------------------------------------------------------
+describe("isMerciLilleOrganizer", () => {
+  it("matches the personal organizer only", () => {
+    expect(isMerciLilleOrganizer("183206")).toBe(true);
+    expect(isMerciLilleOrganizer(183206)).toBe(true);
+    expect(isMerciLilleOrganizer("999999")).toBe(false);
+  });
+});
+
+describe("getShotnotifIntegrationUrl", () => {
+  it("uses the production URL by default", () => {
+    expect(getShotnotifIntegrationUrl({})).toBe(
+      "https://api.mercilille.com/api/integrations/shotnotif/events/detected"
+    );
+  });
+
+  it("allows overriding the URL through env", () => {
+    expect(
+      getShotnotifIntegrationUrl({
+        SHOTNOTIF_INTEGRATION_URL: "http://localhost:3000/api/integrations/shotnotif/events/detected",
+      })
+    ).toBe("http://localhost:3000/api/integrations/shotnotif/events/detected");
+  });
+});
+
+describe("buildShotnotifRequestId", () => {
+  it("creates a stable request id from event id and detection time", () => {
+    expect(buildShotnotifRequestId(410006, "2026-04-07T12:00:00.000Z")).toBe(
+      "shotnotif-410006-2026-04-07T12:00:00.000Z"
+    );
+  });
+});
+
+describe("buildShotnotifIntegrationBody", () => {
+  it("builds the expected request body", () => {
+    expect(
+      buildShotnotifIntegrationBody({
+        organizerId: "183206",
+        shotgunEventId: 410006,
+        requestId: "shotnotif-410006-2026-04-07T12:00:00.000Z",
+        detectedAt: "2026-04-07T12:00:00.000Z",
+        eventName: "Merci Lille Opening",
+      })
+    ).toEqual({
+      organizerId: "183206",
+      shotgunEventId: 410006,
+      requestId: "shotnotif-410006-2026-04-07T12:00:00.000Z",
+      detectedAt: "2026-04-07T12:00:00.000Z",
+      trigger: "new_event_detected",
+      source: "shotnotif",
+      eventName: "Merci Lille Opening",
+    });
+  });
+
+  it("omits eventName when empty", () => {
+    expect(
+      buildShotnotifIntegrationBody({
+        organizerId: "183206",
+        shotgunEventId: "410006",
+        requestId: "r1",
+        detectedAt: "2026-04-07T12:00:00.000Z",
+      })
+    ).toEqual({
+      organizerId: "183206",
+      shotgunEventId: 410006,
+      requestId: "r1",
+      detectedAt: "2026-04-07T12:00:00.000Z",
+      trigger: "new_event_detected",
+      source: "shotnotif",
+    });
+  });
+});
+
+describe("buildShotnotifSignaturePayload", () => {
+  it("matches the backend signing contract exactly", () => {
+    expect(
+      buildShotnotifSignaturePayload({
+        timestamp: "1775553600",
+        method: "POST",
+        path: "/api/integrations/shotnotif/events/detected",
+        organizerId: "183206",
+        shotgunEventId: 410006,
+        requestId: "shotnotif-410006-2026-04-07T12:00:00.000Z",
+        detectedAt: "2026-04-07T12:00:00.000Z",
+        trigger: "new_event_detected",
+      })
+    ).toBe(
+      [
+        "1775553600",
+        "POST",
+        "/api/integrations/shotnotif/events/detected",
+        "183206",
+        "410006",
+        "shotnotif-410006-2026-04-07T12:00:00.000Z",
+        "2026-04-07T12:00:00.000Z",
+        "new_event_detected",
+      ].join("\n")
+    );
+  });
+});
+
+describe("createShotnotifSignature", () => {
+  it("builds the expected HMAC signature", () => {
+    const payload = buildShotnotifSignaturePayload({
+      timestamp: "1775553600",
+      method: "POST",
+      path: "/api/integrations/shotnotif/events/detected",
+      organizerId: "183206",
+      shotgunEventId: 410006,
+      requestId: "shotnotif-410006-2026-04-07T12:00:00.000Z",
+      detectedAt: "2026-04-07T12:00:00.000Z",
+      trigger: "new_event_detected",
+    });
+
+    expect(
+      createShotnotifSignature(
+        "test-shotnotif-secret",
+        payload
+      )
+    ).toBe("sha256=07897ad09b821832a1a7952893d9d1420f0e591c2ebdec52dc7292221611a912");
+  });
+});
+
+describe("getShotnotifRetryDelayMinutes", () => {
+  it("uses a capped retry ladder", () => {
+    expect(getShotnotifRetryDelayMinutes(1)).toBe(1);
+    expect(getShotnotifRetryDelayMinutes(2)).toBe(5);
+    expect(getShotnotifRetryDelayMinutes(3)).toBe(15);
+    expect(getShotnotifRetryDelayMinutes(4)).toBe(60);
+    expect(getShotnotifRetryDelayMinutes(5)).toBe(360);
+    expect(getShotnotifRetryDelayMinutes(999)).toBe(1440);
+  });
+});
+
+describe("getShotnotifRetryAt", () => {
+  it("computes the next retry date from the attempt number", () => {
+    expect(getShotnotifRetryAt("2026-04-07T12:00:00.000Z", 1)).toBe("2026-04-07T12:01:00.000Z");
+    expect(getShotnotifRetryAt("2026-04-07T12:00:00.000Z", 3)).toBe("2026-04-07T12:15:00.000Z");
+  });
+
+  it("returns empty when the start date is invalid", () => {
+    expect(getShotnotifRetryAt("not-a-date", 1)).toBe("");
   });
 });
