@@ -43,6 +43,8 @@
 4. **Premier cycle** : *bootstrap* — import historique (plafonné en pages par événement), **sans** Telegram.
 5. **Cycles suivants** : sync incrémental + **une notification Telegram par événement** ayant eu des ventes sur ce run, avec texte issu du **template TipTap** (JSON) + variables métier.
 6. L’organisateur peut configurer la **fréquence de vérification** (`check_interval`), activer le mode **"poster au nom du canal"** (`send_as_chat`), et envoyer du **feedback** directement depuis le dashboard.
+7. Depuis le **7 avril 2026**, le Worker sait aussi **découvrir les nouveaux events Shotgun** et, pour l'organizer personnel **`183206`** uniquement, les pousser vers **Merci Lille** via une API **serveur-à-serveur signée en HMAC**.
+8. Le premier bootstrap de cette intégration **seed** les events déjà existants comme `known` en D1, **sans** les exporter en masse ; seuls les **nouveaux events découverts après déploiement** sont envoyés.
 
 **Contraintes actuelles** : une destination Telegram par organisateur (`telegram_chat_id` unique) ; pas de file multi-canal en prod (WhatsApp / Discord / Messenger sont surtout préparés côté UI).
 
@@ -66,6 +68,7 @@ flowchart LR
   subgraph ext["Services externes"]
     SG["Shotgun API\n(events / tickets)"]
     TG["Telegram Bot API"]
+    ML["Merci Lille API"]
   end
   WEB -->|"Bearer JWT Shotgun\nNEXT_PUBLIC_API_URL"| W
   WEB -->|"discover / validate-chat\nroutes Next.js"| TG
@@ -75,6 +78,7 @@ flowchart LR
   CRON --> W
   W --> SG
   W --> TG
+  W -->|"new_event_detected\norganizer 183206 only"| ML
 ```
 
 | Flux | Rôle |
@@ -187,6 +191,7 @@ Migrations dans `apps/worker/migrations/`. Après clonage, adapter **`database_n
 | `organizer_id` | FK → `organizers` |
 | `bootstrapped` | `0` → passage bootstrap ; `1` → sync incrémental |
 | `cursor` | Curseur tickets Shotgun (`updatedAt_ticketId`) |
+| `events_seeded` | `0` tant que le registre d'events n'a pas été initialisé ; `1` après seed des events déjà connus |
 
 ### `tickets`
 
@@ -196,6 +201,22 @@ Suivi par billet : `counted` pour savoir si une vente a déjà été notifiée.
 
 Agrégats vendus par événement et par vague / type de billet.
 
+### `organizer_events`
+
+Registre des events Shotgun connus par organisateur, introduit pour l'intégration personnelle Merci Lille :
+
+| Colonne | Description |
+|---------|-------------|
+| `organizer_id` / `event_id` | PK composite du registre |
+| `event_name` | Nom Shotgun vu lors de la dernière découverte |
+| `first_seen_at` / `last_seen_at` | Horodatage de découverte et de dernier passage |
+| `integration_status` | `known`, `pending`, `retry` ou `done` |
+| `integration_attempts` | Nombre d'essais d'envoi vers Merci Lille |
+| `integration_request_id` | Request ID stable pour l'appel HMAC |
+| `next_retry_at` | Horodatage du prochain retry si l'envoi a échoué |
+| `last_integration_attempt_at` / `integrated_at` | Suivi opérationnel de l'export |
+| `last_integration_error` | Dernier message d'erreur enregistré |
+
 ### `rate_limits`
 
 Sliding window rate limiting par IP + endpoint (migration `0005`).
@@ -203,6 +224,7 @@ Sliding window rate limiting par IP + endpoint (migration `0005`).
 ### Index
 
 - `idx_organizers_cron` sur `(is_active, last_checked_at)` — optimise la requête cron (migration `0006`).
+- `idx_organizer_events_retry` sur `(organizer_id, integration_status, next_retry_at)` — optimise les exports Merci Lille en attente (migration `0007`).
 
 **Commandes** (depuis `apps/worker`) :
 
@@ -219,8 +241,8 @@ npm run db:migrate:remote   # D1 production
 
 Le code Worker est séparé en deux fichiers :
 
-- **`index.js`** — logique principale : handlers `fetch` / `scheduled`, sync Shotgun, envoi Telegram, CORS, rate limiting.
-- **`helpers.js`** — fonctions pures extraites pour testabilité : parsing, validation, construction d'URLs, formatage de données de notification.
+- **`index.js`** — logique principale : handlers `fetch` / `scheduled`, sync Shotgun, envoi Telegram, CORS, rate limiting, découverte de nouveaux events et export personnel vers Merci Lille.
+- **`helpers.js`** — fonctions pures extraites pour testabilité : parsing, validation, construction d'URLs, formatage de données de notification, signature HMAC et calcul des retries.
 
 ### Constantes notables (`index.js`)
 
@@ -237,6 +259,18 @@ Le code Worker est séparé en deux fichiers :
 - **Liste événements** : `GET https://smartboard-api.shotgun.live/api/shotgun/organizers/{id}/events?key={token}` (auth login + métadonnées deals).
 - **Tickets** : `GET https://api.shotgun.live/tickets` avec `organizer_id`, `event_id`, `include_cohosted_events`, pagination `after`.
 
+### Intégration Merci Lille (personnelle)
+
+- Scope strict : **organizer `183206` uniquement**. Les autres organisateurs ne déclenchent **aucun** appel externe supplémentaire.
+- Trigger : **`new_event_detected`** quand un `event_id` jamais vu est découvert dans la liste events Shotgun.
+- Bootstrap de sécurité : au premier passage, les events déjà existants sont marqués `known` en D1, **sans envoi** vers Merci Lille.
+- Export : `POST https://api.mercilille.com/api/integrations/shotnotif/events/detected`.
+- Auth : HMAC SHA-256 via le secret Worker `SHOTNOTIF_INTEGRATION_SECRET`.
+- Body envoyé : `organizerId`, `shotgunEventId`, `requestId`, `detectedAt`, `trigger: "new_event_detected"`, et optionnellement `source` / `eventName`.
+- Idempotence : côté ShotNotif via `organizer_events`, côté Merci Lille via `shotgunId` et sa logique `created / updated / unchanged`.
+- Retry : ladder `1 min`, `5 min`, `15 min`, `60 min`, `6 h`, puis `24 h`.
+- Vigilance connue : la découverte repose sur l'API events organisateur ; si Shotgun n'expose pas un cas co-orga dans cette liste, l'event ne sera jamais exporté.
+
 ### Telegram
 
 - `POST https://api.telegram.org/bot{token}/sendMessage` avec `disable_web_page_preview: true`.
@@ -249,7 +283,7 @@ Le code Worker est séparé en deux fichiers :
 
 ### Cron
 
-Déclaré dans `wrangler.jsonc` : `"crons": ["* * * * *"]` (chaque minute). Handler : `scheduled` → `runCron(env.DB)`.
+Déclaré dans `wrangler.jsonc` : `"crons": ["* * * * *"]` (chaque minute). Handler : `scheduled` → `runCron(env.DB, env)`.
 
 Le cron respecte le `check_interval` par organisateur : seuls les organisateurs dont le dernier check date de plus de `check_interval` minutes sont traités. L'index `idx_organizers_cron` optimise cette requête.
 
@@ -416,8 +450,12 @@ npm run still     # Export poster PNG (frame 420)
 | Variable | Obligatoire prod | Description |
 |----------|------------------|-------------|
 | `ALLOWED_ORIGINS` | Non | Origines CORS autorisées, virgule-séparées (défaut : `https://shotnotif.vercel.app`) |
+| `SHOTNOTIF_INTEGRATION_SECRET` | Oui pour l'intégration Merci Lille | Secret HMAC partagé avec Merci Lille pour signer `new_event_detected` |
+| `SHOTNOTIF_INTEGRATION_URL` | Non | Override de l'endpoint Merci Lille (défaut prod : `https://api.mercilille.com/api/integrations/shotnotif/events/detected`) |
 
 La logique **v3** lit tokens Telegram, chat_id et templates depuis **D1**, pas depuis des secrets Wrangler pour le cron. Le DSN Sentry Worker est hardcodé dans `index.js`.
+
+Pour le développement local, `wrangler dev` charge aussi les secrets définis dans **`.dev.vars`**.
 
 ---
 
@@ -433,7 +471,7 @@ npm test           # exécution unique
 npm run test:watch # mode watch
 ```
 
-**38 tests** couvrant toutes les fonctions exportées :
+**49 tests** couvrent les fonctions exportées, y compris la nouvelle couche d'intégration Merci Lille :
 
 | Fonction | Tests | Description |
 |----------|-------|-------------|
@@ -449,6 +487,7 @@ npm run test:watch # mode watch
 | `buildTicketsUrl` | 3 | Construction URL API tickets Shotgun |
 | `buildNotificationData` | 3 | Formatage données de notification |
 | `isValidCheckInterval` | 2 | Validation intervalle de check |
+| Helpers Merci Lille (`isMerciLilleOrganizer`, body, signature, retry) | 11 | Scope perso, contrat HMAC et ladder de retry |
 
 ---
 
@@ -521,13 +560,26 @@ cd apps/worker && npx wrangler deploy --dry-run   # optionnel
 ### Worker
 
 1. Vérifier `wrangler.jsonc` (**nom Worker**, **binding D1**, `database_id` réel).
-2. Appliquer les migrations **remote** si le schéma a changé :
+2. Configurer les secrets Worker requis :
+
+```bash
+cd apps/worker
+npx wrangler secret put SHOTNOTIF_INTEGRATION_SECRET
+```
+
+3. Appliquer les migrations **remote** si le schéma a changé :
 
 ```bash
 cd apps/worker
 npm run db:migrate:remote
 npx wrangler deploy
 ```
+
+Le **7 avril 2026**, les opérations suivantes ont été appliquées en prod pour l'intégration Merci Lille :
+
+- migration D1 `0007_shotnotif_event_exports.sql`
+- secret Worker `SHOTNOTIF_INTEGRATION_SECRET`
+- déploiement du Worker `notifshotgun`
 
 ### Site Next.js
 
@@ -544,6 +596,8 @@ Déployer sur **Vercel**, **Cloudflare Pages**, etc. Définir **`NEXT_PUBLIC_API
 - [ ] Login dashboard OK (CORS + URL API)
 - [ ] Cron visible dans le dashboard Cloudflare (Triggers)
 - [ ] D1 : ligne `organizers` mise à jour après sauvegarde dashboard
+- [ ] D1 : table `organizer_events` présente et alimentée pour `183206`
+- [ ] Secret `SHOTNOTIF_INTEGRATION_SECRET` présent côté Worker
 - [ ] Sentry : erreurs remontent (front + Worker)
 - [ ] Plausible : pageviews trackées
 
@@ -594,6 +648,9 @@ Dashboard Plausible pour le suivi des pageviews, sources de trafic, et engagemen
 | Hydratation React / texte EN puis FR | Comportement attendu après fix i18n (premier paint EN, puis locale) ; ou extension navigateur modifiant le DOM |
 | Login « token invalide » | `NEXT_PUBLIC_API_URL` incorrect, Worker down, JWT refusé par Shotgun (`401/403` sur liste événements) |
 | Aucune notif Telegram | Champs vides en D1, bot retiré du chat, ou **webhook Telegram** déjà défini → `getUpdates` vide (erreur 409 côté discover) |
+| L'event n'apparaît pas dans Merci Lille | Vérifier que l'event est **nouveau après le déploiement**, que l'organizer est bien `183206`, et inspecter `organizer_events.integration_status` / `last_integration_error` |
+| Besoin de simuler sans nouvel event | Deux options : `POST` signé directement vers Merci Lille, ou réarmer une ligne `organizer_events` existante en `pending` pour laisser le cron rejouer l'export |
+| Event co-orga non exporté | Point de vigilance connu : la découverte s'appuie sur l'API events organisateur ; confirmer que Shotgun expose bien cet event dans la liste retournée |
 | Liste chats vide | Envoyer un message au bot / dans le groupe puis relancer **Détecter mes chats** |
 | Template cassé | Worker retombe sur défaut + fallback texte ; inspecter `GET /api/template` |
 | Bootstrap long | Normal si beaucoup d’historique ; plafond `BOOTSTRAP_MAX_PAGES` |
