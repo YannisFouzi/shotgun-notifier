@@ -4,7 +4,7 @@ import { createHmac } from "node:crypto";
 // Pure / near-pure helpers extracted for testability
 // ---------------------------------------------------------------------------
 
-const COUNTED_STATUSES = new Set(["valid", "resold"]);
+const COUNTED_STATUSES = new Set(["valid"]);
 const CHECK_INTERVAL_OPTIONS = new Set([1, 5, 10, 60, 300, 720, 1440, 10080]);
 const DEFAULT_CHECK_INTERVAL = 1;
 const DEFAULT_ALLOWED_ORIGINS = "https://shotnotif.com,https://www.shotnotif.com,https://shotnotif.vercel.app";

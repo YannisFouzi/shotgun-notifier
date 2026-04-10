@@ -39,7 +39,7 @@
 
 1. L’organisateur ouvre le site, colle son **JWT API Shotgun** (Smartboard — même famille que *Paramètres → Integrations* sur Shotgun).
 2. Le **Worker** valide le token contre l’API Shotgun, **upsert** une ligne `organizers` en D1.
-3. Un **cron configurable** (1 min par défaut, jusqu’à hebdomadaire) interroge l’API tickets Shotgun, met à jour les compteurs et détecte les **nouveaux** billets aux statuts comptés (`valid`, `resold`).
+3. Un **cron configurable** (1 min par défaut, jusqu’à hebdomadaire) interroge l’API tickets Shotgun, met à jour les compteurs et détecte les **nouveaux** billets au statut compté (`valid`).
 4. **Premier cycle** : *bootstrap* — import historique (plafonné en pages par événement), **sans** Telegram.
 5. **Cycles suivants** : sync incrémental + **une notification Telegram par événement** ayant eu des ventes sur ce run, avec texte issu du **template TipTap** (JSON) + variables métier.
 6. L’organisateur peut configurer la **fréquence de vérification** (`check_interval`), activer le mode **"poster au nom du canal"** (`send_as_chat`), et envoyer du **feedback** directement depuis le dashboard.
@@ -251,7 +251,7 @@ Le code Worker est séparé en deux fichiers :
 | `VERSION` | `shotgun-notifier-v3` | Health + logs |
 | `BOOTSTRAP_MAX_PAGES` | `200` | Plafond de pages tickets **par événement** au bootstrap |
 | `SYNC_MAX_PAGES_PER_RUN` | `10` | Pages tickets max **par événement** par minute de cron |
-| `COUNTED_STATUSES` | `valid`, `resold` | Statuts Shotgun pris en compte pour les ventes |
+| `COUNTED_STATUSES` | `valid` | Statut Shotgun pris en compte pour les ventes |
 | `CHECK_INTERVAL_OPTIONS` | `1, 5, 10, 60, 300, 720, 1440, 10080` | Intervalles de check autorisés (minutes) |
 
 ### APIs Shotgun utilisées
@@ -317,6 +317,7 @@ Le Worker est wrappé avec `Sentry.withSentry()` de `@sentry/cloudflare`. Les er
 | `GET` | `/api/template` | Bearer | Template TipTap normalisé + settings |
 | `PUT` | `/api/template` | Bearer | Met à jour `messageTemplate` / `messageTemplateSettings` |
 | `DELETE` | `/api/account` | Bearer | Supprime l’organisateur et données associées (batch SQL) |
+| `POST` | `/api/resync` | Bearer | Purge les compteurs et force un bootstrap complet au prochain cron |
 
 **Auth** : `Authorization: Bearer <JWT>` doit **exactement** égaler `organizers.shotgun_token` pour l’`organizerId` dérivé du JWT.
 
@@ -471,7 +472,7 @@ npm test           # exécution unique
 npm run test:watch # mode watch
 ```
 
-**49 tests** couvrent les fonctions exportées, y compris la nouvelle couche d'intégration Merci Lille :
+**50 tests** couvrent les fonctions exportées, y compris la nouvelle couche d'intégration Merci Lille :
 
 | Fonction | Tests | Description |
 |----------|-------|-------------|

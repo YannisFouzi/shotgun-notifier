@@ -424,6 +424,14 @@ async function processOrganizerEventExports(db, env, organizer) {
 // D1 data access
 // ---------------------------------------------------------------------------
 
+async function getResyncGeneration(db, organizerId) {
+  const row = await db
+    .prepare("SELECT resync_generation FROM organizers WHERE id = ?")
+    .bind(organizerId)
+    .first();
+  return row ? toInt(row.resync_generation) : 0;
+}
+
 async function getTicketCounted(db, organizerId, ticketId) {
   const row = await db
     .prepare(
@@ -512,7 +520,31 @@ async function getSyncState(db, organizerId) {
   };
 }
 
-async function setSyncState(db, organizerId, bootstrapped, cursor, eventsSeeded) {
+async function setSyncState(db, organizerId, bootstrapped, cursor, eventsSeeded, expectedGeneration) {
+  // When expectedGeneration is provided, the write is conditional: the INSERT
+  // uses a SELECT that returns 0 rows if resync_generation no longer matches,
+  // making it a no-op at the SQL level — no check-then-act race.
+  if (expectedGeneration !== undefined) {
+    const { meta } = await db
+      .prepare(
+        `INSERT INTO sync_state (organizer_id, bootstrapped, cursor, events_seeded, updated_at)
+         SELECT ?, ?, ?, ?, datetime('now')
+         FROM organizers WHERE id = ? AND resync_generation = ?
+         ON CONFLICT (organizer_id)
+         DO UPDATE SET
+           bootstrapped = excluded.bootstrapped,
+           cursor = excluded.cursor,
+           events_seeded = excluded.events_seeded,
+           updated_at = excluded.updated_at`
+      )
+      .bind(
+        organizerId, bootstrapped ? 1 : 0, cursor, eventsSeeded ? 1 : 0,
+        organizerId, expectedGeneration
+      )
+      .run();
+    return (meta?.changes ?? 0) > 0;
+  }
+
   await db
     .prepare(
       `INSERT INTO sync_state (organizer_id, bootstrapped, cursor, events_seeded, updated_at)
@@ -526,6 +558,7 @@ async function setSyncState(db, organizerId, bootstrapped, cursor, eventsSeeded)
     )
     .bind(organizerId, bootstrapped ? 1 : 0, cursor, eventsSeeded ? 1 : 0)
     .run();
+  return true;
 }
 
 async function listOrganizerEvents(db, organizerId) {
@@ -800,7 +833,18 @@ async function collectTicketsForEvent(organizerId, shotgunToken, eventId, maxPag
 
 async function bootstrapOrganizer(db, organizer) {
   const { id: organizerId, shotgun_token: shotgunToken } = organizer;
+  const generationAtStart = toInt(organizer.resync_generation);
   console.log(`[${VERSION}] Bootstrap started for organizer ${organizerId}`);
+
+  // Purge any stale data left by a previous run that was interrupted by a
+  // resync (its writes survived because ON CONFLICT DO UPDATE doesn't clean
+  // rows whose real count is now zero). This ensures the bootstrap starts
+  // from a truly blank slate.
+  await db.batch([
+    db.prepare("DELETE FROM tickets WHERE organizer_id = ?").bind(organizerId),
+    db.prepare("DELETE FROM event_counts WHERE organizer_id = ?").bind(organizerId),
+    db.prepare("DELETE FROM deal_counts WHERE organizer_id = ?").bind(organizerId),
+  ]);
 
   const events = await fetchEvents(organizerId, shotgunToken);
   const shouldTrackOrganizerEvents = isMerciLilleOrganizer(organizerId);
@@ -842,6 +886,15 @@ async function bootstrapOrganizer(db, organizer) {
       const dk = `${eventId}:${dealTitle}`;
       dealCounts.set(dk, (dealCounts.get(dk) || 0) + 1);
     }
+  }
+
+  // Check if a resync was requested while we were fetching from Shotgun.
+  // If the generation changed, discard everything — the next cron tick will
+  // start a fresh bootstrap with clean state.
+  const generationNow = await getResyncGeneration(db, organizerId);
+  if (generationNow !== generationAtStart) {
+    console.log(`[${VERSION}] Bootstrap aborted for organizer ${organizerId}: resync detected (generation ${generationAtStart} → ${generationNow})`);
+    return;
   }
 
   // Batch write tickets
@@ -903,7 +956,14 @@ async function bootstrapOrganizer(db, organizer) {
     }
   }
 
-  await setSyncState(db, organizerId, true, lastCursor, shouldTrackOrganizerEvents);
+  // Atomic write: only commits sync_state if resync_generation still matches.
+  // If a resync purged everything after the early check above, the INSERT is
+  // a no-op and the next cron tick will re-bootstrap with clean state.
+  const written = await setSyncState(db, organizerId, true, lastCursor, shouldTrackOrganizerEvents, generationAtStart);
+  if (!written) {
+    console.log(`[${VERSION}] Bootstrap state discarded for organizer ${organizerId}: resync detected at commit`);
+    return;
+  }
 
   console.log(
     `[${VERSION}] Bootstrap completed for ${organizerId}: ${allRows.length} tickets, ${eventCounts.size} events`
@@ -916,6 +976,7 @@ async function bootstrapOrganizer(db, organizer) {
 
 async function syncOrganizer(db, env, organizer, maxPagesPerEvent = SYNC_MAX_PAGES_PER_RUN) {
   const { id: organizerId, shotgun_token: shotgunToken } = organizer;
+  const generationAtStart = toInt(organizer.resync_generation);
   const syncState = await getSyncState(db, organizerId);
   const cursor = syncState.cursor || "";
   const shouldTrackOrganizerEvents = isMerciLilleOrganizer(organizerId);
@@ -965,10 +1026,14 @@ async function syncOrganizer(db, env, organizer, maxPagesPerEvent = SYNC_MAX_PAG
     dealsMap.set(event.id, event.deals);
   }
 
-  // In-memory caches for this sync run
+  // In-memory caches for this sync run.
+  // DB writes are deferred into pendingStatements so that nothing touches
+  // tickets / event_counts / deal_counts until we have verified that no
+  // resync has invalidated this run.
   const eventCountCache = new Map();
   const dealCountCache = new Map();
   const saleNotifications = new Map();
+  const pendingStatements = [];
   let lastCursor = cursor;
 
   for (const ticket of rows) {
@@ -993,8 +1058,27 @@ async function syncOrganizer(db, env, organizer, maxPagesPerEvent = SYNC_MAX_PAG
         : Math.max(0, currentCount - 1);
       eventCountCache.set(eventId, nextCount);
 
-      await setTicketCounted(db, organizerId, ticketId, eventId, dealTitle, nextCounted);
-      await setEventCount(db, organizerId, eventId, nextCount);
+      // Defer writes — they will be flushed after the generation check
+      pendingStatements.push(
+        db
+          .prepare(
+            `INSERT INTO tickets (organizer_id, ticket_id, event_id, deal_title, counted)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT (organizer_id, ticket_id)
+             DO UPDATE SET counted = excluded.counted, deal_title = excluded.deal_title`
+          )
+          .bind(organizerId, ticketId, eventId, dealTitle, nextCounted ? 1 : 0)
+      );
+      pendingStatements.push(
+        db
+          .prepare(
+            `INSERT INTO event_counts (organizer_id, event_id, sold_count, updated_at)
+             VALUES (?, ?, ?, datetime('now'))
+             ON CONFLICT (organizer_id, event_id)
+             DO UPDATE SET sold_count = excluded.sold_count, updated_at = excluded.updated_at`
+          )
+          .bind(organizerId, eventId, nextCount)
+      );
 
       if (dealTitle) {
         const dealCacheKey = `${eventId}:${dealTitle}`;
@@ -1009,7 +1093,16 @@ async function syncOrganizer(db, env, organizer, maxPagesPerEvent = SYNC_MAX_PAG
           ? currentDealCount + 1
           : Math.max(0, currentDealCount - 1);
         dealCountCache.set(dealCacheKey, nextDealCount);
-        await setDealCount(db, organizerId, eventId, dealTitle, nextDealCount);
+        pendingStatements.push(
+          db
+            .prepare(
+              `INSERT INTO deal_counts (organizer_id, event_id, deal_title, count, updated_at)
+               VALUES (?, ?, ?, ?, datetime('now'))
+               ON CONFLICT (organizer_id, event_id, deal_title)
+               DO UPDATE SET count = excluded.count, updated_at = excluded.updated_at`
+            )
+            .bind(organizerId, eventId, dealTitle, nextDealCount)
+        );
       }
     }
 
@@ -1037,16 +1130,65 @@ async function syncOrganizer(db, env, organizer, maxPagesPerEvent = SYNC_MAX_PAG
     }
   }
 
+  // Generation check: if a resync happened during ticket processing, discard
+  // all pending writes and skip notifications / exports entirely.
+  const generationCheck = await getResyncGeneration(db, organizerId);
+  if (generationCheck !== generationAtStart) {
+    console.log(`[${VERSION}] Sync aborted for organizer ${organizerId}: resync detected (generation ${generationAtStart} → ${generationCheck}), ${pendingStatements.length} writes discarded`);
+    return {
+      processed: rows.length,
+      notifications: 0,
+      aborted: true,
+      newEventsDiscovered: 0,
+      newEventsQueued: 0,
+      eventExportsAttempted: 0,
+      eventExportsDelivered: 0,
+      eventExportsFailed: 0,
+      eventExportsBlocked: 0,
+    };
+  }
+
+  // Flush deferred writes now that we know the generation is still valid
+  for (let i = 0; i < pendingStatements.length; i += 400) {
+    await db.batch(pendingStatements.slice(i, i + 400));
+  }
+
+  // Check generation again before external effects (Merci Lille export)
+  const generationBeforeExport = await getResyncGeneration(db, organizerId);
+  if (generationBeforeExport !== generationAtStart) {
+    console.log(`[${VERSION}] Sync aborted before exports for organizer ${organizerId}: resync detected`);
+    return {
+      processed: rows.length,
+      notifications: 0,
+      aborted: true,
+      newEventsDiscovered: eventRegistry.discovered,
+      newEventsQueued: eventRegistry.queued,
+      eventExportsAttempted: 0,
+      eventExportsDelivered: 0,
+      eventExportsFailed: 0,
+      eventExportsBlocked: 0,
+    };
+  }
+
   const exportResult = await processOrganizerEventExports(db, env, organizer);
 
-  // Send notifications
+  // Send notifications — check generation before EACH send to minimise the
+  // window for duplicate messages if a resync lands mid-loop.
   let sent = 0;
+  let aborted = false;
   if (organizer.telegram_token && organizer.telegram_chat_id) {
     const sendAsChat =
       sqliteIntFlagIsOn(organizer.telegram_send_as_chat) &&
       organizerTargetSupportsSendAsChat(organizer);
 
     for (const notification of saleNotifications.values()) {
+      const genBeforeSend = await getResyncGeneration(db, organizerId);
+      if (genBeforeSend !== generationAtStart) {
+        console.log(`[${VERSION}] Sync notifications aborted for organizer ${organizerId}: resync detected before send`);
+        aborted = true;
+        break;
+      }
+
       const data = buildNotificationData(
         notification, eventCountCache, dealCountCache, dealsMap
       );
@@ -1062,11 +1204,19 @@ async function syncOrganizer(db, env, organizer, maxPagesPerEvent = SYNC_MAX_PAG
     }
   }
 
-  await setSyncState(db, organizerId, true, lastCursor, eventsSeeded);
+  // Atomic write: setSyncState only succeeds if resync_generation still matches.
+  // If a resync happened at any point (including between the last genBeforeSend
+  // check and now), this is a no-op and the next cron tick will bootstrap.
+  const written = await setSyncState(db, organizerId, true, lastCursor, eventsSeeded, generationAtStart);
+  if (!written) {
+    console.log(`[${VERSION}] Sync state discarded for organizer ${organizerId}: resync detected at commit`);
+    aborted = true;
+  }
 
   return {
     processed: rows.length,
     notifications: sent,
+    aborted,
     newEventsDiscovered: eventRegistry.discovered,
     newEventsQueued: eventRegistry.queued,
     eventExportsAttempted: exportResult.attempted,
@@ -1117,10 +1267,11 @@ async function runCron(db, env) {
         });
       }
 
-      // Mark this organizer as just checked
+      // Atomically update last_checked_at only if resync_generation hasn't
+      // changed. If a resync happened, the WHERE won't match → no-op.
       await db
-        .prepare("UPDATE organizers SET last_checked_at = datetime('now') WHERE id = ?")
-        .bind(organizer.id)
+        .prepare("UPDATE organizers SET last_checked_at = datetime('now') WHERE id = ? AND resync_generation = ?")
+        .bind(organizer.id, toInt(organizer.resync_generation))
         .run();
     } catch (error) {
       console.error(
@@ -1516,6 +1667,34 @@ async function handleAdminStats(request, db) {
 }
 
 // ---------------------------------------------------------------------------
+// Resync — force a full recount from Shotgun for the authenticated organizer
+// ---------------------------------------------------------------------------
+
+async function handleResync(request, db) {
+  const organizer = await authenticate(request, db);
+  if (!organizer) return jsonResponse({ error: "Non autorise" }, 401);
+
+  const organizerId = String(organizer.id);
+
+  // Atomic batch:
+  // 1. Increment resync_generation so any in-flight sync/bootstrap detects the
+  //    invalidation and discards its results before writing to DB.
+  // 2. Purge all stale counters and ticket tracking.
+  // 3. Reset last_checked_at so the next cron tick triggers a fresh bootstrap.
+  await db.batch([
+    db.prepare("UPDATE organizers SET resync_generation = resync_generation + 1, last_checked_at = '' WHERE id = ?").bind(organizerId),
+    db.prepare("DELETE FROM tickets WHERE organizer_id = ?").bind(organizerId),
+    db.prepare("DELETE FROM event_counts WHERE organizer_id = ?").bind(organizerId),
+    db.prepare("DELETE FROM deal_counts WHERE organizer_id = ?").bind(organizerId),
+    db.prepare("DELETE FROM sync_state WHERE organizer_id = ?").bind(organizerId),
+  ]);
+
+  console.log(`[${VERSION}] Resync requested for organizer ${organizerId}: generation incremented, counters purged, bootstrap will run on next cron tick`);
+
+  return jsonResponse({ ok: true, message: "Resync scheduled. Counters will be recalculated on the next check." });
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -1529,6 +1708,7 @@ function matchRoute(method, pathname) {
     { method: "PUT", path: "/api/template", handler: handleUpdateTemplate },
     { method: "DELETE", path: "/api/account", handler: handleDeleteAccount },
     { method: "GET", path: "/api/admin/stats", handler: handleAdminStats },
+    { method: "POST", path: "/api/resync", handler: handleResync },
   ];
 
   return routes.find((r) => r.method === method && r.path === pathname);

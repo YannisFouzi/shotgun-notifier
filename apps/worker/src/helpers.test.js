@@ -51,14 +51,17 @@ describe("toInt", () => {
 // isCountedStatus
 // ---------------------------------------------------------------------------
 describe("isCountedStatus", () => {
-  it("counts valid and resold", () => {
+  it("counts only valid", () => {
     expect(isCountedStatus("valid")).toBe(true);
-    expect(isCountedStatus("resold")).toBe(true);
+  });
+
+  it("does not count resold", () => {
+    expect(isCountedStatus("resold")).toBe(false);
   });
 
   it("is case-insensitive and trims", () => {
     expect(isCountedStatus("VALID")).toBe(true);
-    expect(isCountedStatus("  Resold  ")).toBe(true);
+    expect(isCountedStatus("  Valid  ")).toBe(true);
   });
 
   it("rejects other statuses", () => {
