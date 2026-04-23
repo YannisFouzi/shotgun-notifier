@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   IPhoneMockup,
@@ -16,26 +16,63 @@ interface TelegramPreviewProps {
   messages?: string[];
 }
 
+const TIMES = ["3 min", "2 min", "now", "now"];
+
+// Non-breaking space: preserves line height while the clock is not yet
+// available on the first client render (see `useLocalizedClock`).
+const CLOCK_PLACEHOLDER = "\u00A0";
+
 function timeLocaleTag(lng: string) {
   return lng.startsWith("fr") ? "fr-FR" : "en-GB";
 }
 
-function getFormattedTime(localeTag: string) {
-  return new Intl.DateTimeFormat(localeTag, {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date());
+/**
+ * Returns the current `Date` on the client, or `null` during SSR and the
+ * first client render (before mount). Ticks every minute.
+ *
+ * Returning `null` pre-mount is what avoids the hydration mismatch: the
+ * server has no notion of the user's wall clock / timezone, so any
+ * `new Date()` call during render would diverge from the client.
+ */
+function useClock(): Date | null {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const intervalId = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return now;
 }
 
-function getFormattedDate(localeTag: string) {
-  return new Intl.DateTimeFormat(localeTag, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(new Date());
-}
+function useLocalizedClock(localeTag: string): { time: string; date: string } {
+  const now = useClock();
 
-const TIMES = ["3 min", "2 min", "now", "now"];
+  const timeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeTag, {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    [localeTag]
+  );
+
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeTag, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }),
+    [localeTag]
+  );
+
+  return {
+    time: now ? timeFormatter.format(now) : CLOCK_PLACEHOLDER,
+    date: now ? dateFormatter.format(now) : CLOCK_PLACEHOLDER,
+  };
+}
 
 export function TelegramPreview({
   message,
@@ -47,6 +84,7 @@ export function TelegramPreview({
   const localeTag = timeLocaleTag(
     i18n.resolvedLanguage || i18n.language || "en"
   );
+  const { time, date } = useLocalizedClock(localeTag);
   const renderedMessage = message || t("telegramPreview.emptyMessage");
   const isGroup = mode === "group";
 
@@ -59,7 +97,8 @@ export function TelegramPreview({
       <AnimatedLockScreen
         messages={messages}
         title={title}
-        localeTag={localeTag}
+        time={time}
+        date={date}
       />
     );
   }
@@ -77,8 +116,8 @@ export function TelegramPreview({
   return (
     <IPhoneMockup scale={0.85} variant="black">
       <IOSLockScreen
-        time={getFormattedTime(localeTag)}
-        date={getFormattedDate(localeTag)}
+        time={time}
+        date={date}
         notifications={notifications}
       />
     </IPhoneMockup>
@@ -166,11 +205,13 @@ function NotifCard({
 function AnimatedLockScreen({
   messages,
   title,
-  localeTag,
+  time,
+  date,
 }: {
   messages: string[];
   title: string;
-  localeTag: string;
+  time: string;
+  date: string;
 }) {
   const [visibleCount, setVisibleCount] = useState(0);
   const [cycle, setCycle] = useState(0);
@@ -226,7 +267,7 @@ function AnimatedLockScreen({
             textAlign: "center",
           }}
         >
-          {getFormattedTime(localeTag)}
+          {time}
         </div>
 
         {/* Date */}
@@ -239,7 +280,7 @@ function AnimatedLockScreen({
             textAlign: "center",
           }}
         >
-          {getFormattedDate(localeTag)}
+          {date}
         </div>
 
         {/* Notifications with stacking animation */}
