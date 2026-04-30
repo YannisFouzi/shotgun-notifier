@@ -290,9 +290,58 @@ describe("buildNotificationData", () => {
     expect(data.new_tickets_count).toBe("3");
     expect(data.new_tickets_label).toBe("3 billets vendus");
     expect(data.event_total_sold).toBe("50");
-    expect(data.deal_lines).toBe("VIP : 10/100");
+    expect(data.deal_lines).toBe("3x VIP : 10/100");
     expect(data.first_deal_name).toBe("VIP");
     expect(data.first_deal_sold).toBe("10");
+  });
+
+  it("omits multiplier prefix when only 1 ticket per deal", () => {
+    const notification = {
+      eventId: "E1",
+      eventName: "Festival",
+      newCount: 1,
+      newDeals: new Map([["VIP", 1]]),
+    };
+    const eventCountCache = new Map([["E1", 50]]);
+    const dealCountCache = new Map([["E1:VIP", 10]]);
+    const dealsMap = new Map([["E1", new Map([["VIP", 100]])]]);
+
+    const data = buildNotificationData(notification, eventCountCache, dealCountCache, dealsMap);
+    expect(data.deal_lines).toBe("VIP : 10/100");
+  });
+
+  it("shows multiplier prefix per deal when several tickets per deal", () => {
+    const notification = {
+      eventId: "E1",
+      eventName: "Festival",
+      newCount: 6,
+      newDeals: new Map([
+        ["VAGUE 3", 2],
+        ["ALLER - 00H", 2],
+        ["RETOUR - 6H15", 2],
+      ]),
+    };
+    const eventCountCache = new Map([["E1", 293]]);
+    const dealCountCache = new Map([
+      ["E1:VAGUE 3", 18],
+      ["E1:ALLER - 00H", 10],
+      ["E1:RETOUR - 6H15", 13],
+    ]);
+    const dealsMap = new Map([
+      [
+        "E1",
+        new Map([
+          ["VAGUE 3", 1501],
+          ["ALLER - 00H", 91],
+          ["RETOUR - 6H15", 90],
+        ]),
+      ],
+    ]);
+
+    const data = buildNotificationData(notification, eventCountCache, dealCountCache, dealsMap);
+    expect(data.deal_lines).toBe(
+      "2x VAGUE 3 : 18/1501\n2x ALLER - 00H : 10/91\n2x RETOUR - 6H15 : 13/90"
+    );
   });
 
   it("singular label for 1 ticket", () => {

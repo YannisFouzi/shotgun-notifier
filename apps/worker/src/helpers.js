@@ -104,10 +104,13 @@ export function buildNotificationData(notification, eventCountCache, dealCountCa
   const eventDeals = dealsMap.get(notification.eventId);
   const dealLines = [];
 
-  for (const [title] of notification.newDeals) {
+  for (const [title, increment] of notification.newDeals) {
     const sold = dealCountCache.get(`${notification.eventId}:${title}`) || 0;
     const max = eventDeals ? eventDeals.get(title) || 0 : 0;
-    const line = max > 0 ? `${title} : ${sold}/${max}` : `${title} : ${sold}`;
+    const prefix = increment > 1 ? `${increment}x ` : "";
+    const line = max > 0
+      ? `${prefix}${title} : ${sold}/${max}`
+      : `${prefix}${title} : ${sold}`;
     dealLines.push(line);
   }
 
